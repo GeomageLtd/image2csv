@@ -808,3 +808,337 @@ textarea:focus {
         font-size: 16px; /* Prevent zoom on iOS */
     }
 }
+
+/* Validation highlight styles */
+.csv-table td.validation-error {
+    background-color: #ffebee !important;
+    border: 2px solid #f44336;
+    position: relative;
+}
+
+.csv-table td.validation-error:hover {
+    background-color: #ffcdd2 !important;
+}
+
+.csv-table td.validation-warning {
+    background-color: #fff3e0 !important;
+    border: 2px solid #ff9800;
+    position: relative;
+}
+
+.csv-table td.validation-warning:hover {
+    background-color: #ffe0b2 !important;
+}
+
+/* Validation indicator */
+.validation-indicator {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 16px;
+    height: 16px;
+    background: #f44336;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    cursor: help;
+    z-index: 15;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.validation-indicator:hover {
+    transform: scale(1.2);
+    z-index: 20;
+}
+
+/* Validation summary styles */
+.validation-summary {
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 0.9em;
+}
+
+.validation-success {
+    background-color: #e8f5e8;
+    border: 1px solid #c3e6c3;
+    color: #155724;
+}
+
+.validation-success strong {
+    color: #0d4d17;
+}
+
+.validation-issues {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.validation-issues h4 {
+    margin-bottom: 15px;
+    color: #6c5a00;
+    font-size: 1.1em;
+}
+
+.column-issues {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 5px;
+}
+
+.column-issues strong {
+    color: #6c5a00;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.column-issues ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.column-issues li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.fix-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+    transition: background-color 0.3s ease;
+    white-space: nowrap;
+}
+
+.fix-btn:hover {
+    background: #218838;
+}
+
+.validation-actions {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #d4c69a;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Enhanced tooltip styles */
+.validation-indicator[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: pre-line;
+    z-index: 1000;
+    min-width: 200px;
+    max-width: 300px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+}
+
+.validation-indicator[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 90%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+}
+
+/* Validation button styles */
+#validateBtn {
+    background: #17a2b8;
+    position: relative;
+}
+
+#validateBtn:hover {
+    background: #138496;
+}
+
+#validateBtn::before {
+    content: '🔍';
+    margin-right: 5px;
+}
+
+/* Animation for validation highlights */
+@keyframes validationPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(244, 67, 54, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+    }
+}
+
+.csv-table td.validation-error {
+    animation: validationPulse 2s infinite;
+}
+
+/* Progress indicator for validation */
+.validation-progress {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+.validation-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.validation-progress-fill {
+    height: 100%;
+    background: linear-gradient(45deg, #17a2b8, #138496);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.validation-progress-text {
+    font-size: 0.8em;
+    color: #6c757d;
+    margin-top: 5px;
+    text-align: center;
+}
+
+/* Statistics panel */
+.validation-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.validation-stat {
+    text-align: center;
+    padding: 10px;
+    background: white;
+    border-radius: 5px;
+    border: 1px solid #e9ecef;
+}
+
+.validation-stat-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #495057;
+}
+
+.validation-stat-label {
+    font-size: 0.8em;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
+.validation-stat.error .validation-stat-value {
+    color: #dc3545;
+}
+
+.validation-stat.warning .validation-stat-value {
+    color: #ffc107;
+}
+
+.validation-stat.success .validation-stat-value {
+    color: #28a745;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .validation-summary {
+        padding: 12px;
+        font-size: 0.85em;
+    }
+    
+    .column-issues li {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .fix-btn {
+        align-self: flex-end;
+        margin-top: 5px;
+    }
+    
+    .validation-actions {
+        flex-direction: column;
+    }
+    
+    .validation-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .validation-indicator[title]:hover::after {
+        min-width: 150px;
+        font-size: 10px;
+        padding: 6px 8px;
+    }
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+    .validation-summary {
+        background-color: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .validation-success {
+        background-color: #1a2e1a;
+        border-color: #2d5a2d;
+        color: #a7f3d0;
+    }
+    
+    .validation-issues {
+        background-color: #2d2817;
+        border-color: #5a4d1a;
+        color: #fbbf24;
+    }
+    
+    .column-issues {
+        background: rgba(0, 0, 0, 0.3);
+    }
+    
+    .validation-stats {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .validation-stat {
+        background-color: #374151;
+        border-color: #4a5568;
+    }
+}

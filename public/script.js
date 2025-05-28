@@ -351,7 +351,7 @@ function displayBatchResults(imageFiles, combinedCsv, results) {
     
     // Store and display CSV
     csvData = combinedCsv;
-    displayCSVTable(csvData);
+    displayCSVTableWithValidation(csvData);
     
     // Show results
     document.getElementById('results').style.display = 'block';
@@ -499,7 +499,7 @@ function displaySavedResults(imageData, csvContent) {
     
     // Clean and display CSV
     csvData = csvContent.trim();
-    displayCSVTable(csvData);
+    displayCSVTableWithValidation(csvData);
     
     // Show results
     document.getElementById('results').style.display = 'block';
@@ -678,59 +678,12 @@ function displayResults(imageFile, csvContent) {
     csvData = csvContent.replace(/```csv\n?/g, '').replace(/```\n?/g, '').trim();
     
     // Parse and display CSV
-    displayCSVTable(csvData);
+    displayCSVTableWithValidation(csvData);
     
     // Show results
     document.getElementById('results').style.display = 'block';
 }
 
-/**
- * Create and display CSV table
- * @param {string} csvContent - Raw CSV content
- */
-function displayCSVTable(csvContent) {
-    const lines = csvContent.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return;
-    
-    const table = document.createElement('table');
-    table.className = 'csv-table';
-    
-    // Create header
-    const headerRow = lines[0].split(',').map(cell => cell.trim().replace(/"/g, ''));
-    const thead = document.createElement('thead');
-    const headerTr = document.createElement('tr');
-    
-    headerRow.forEach(header => {
-        const th = document.createElement('th');
-        th.textContent = header;
-        headerTr.appendChild(th);
-    });
-    
-    thead.appendChild(headerTr);
-    table.appendChild(thead);
-    
-    // Create body
-    const tbody = document.createElement('tbody');
-    
-    for (let i = 1; i < lines.length; i++) {
-        const row = lines[i].split(',').map(cell => cell.trim().replace(/"/g, ''));
-        const tr = document.createElement('tr');
-        
-        row.forEach(cell => {
-            const td = document.createElement('td');
-            td.textContent = cell;
-            tr.appendChild(td);
-        });
-        
-        tbody.appendChild(tr);
-    }
-    
-    table.appendChild(tbody);
-    
-    const container = document.getElementById('csvTableContainer');
-    container.innerHTML = '';
-    container.appendChild(table);
-}
 
 // UI State Management Functions
 
@@ -846,7 +799,7 @@ function displayBatchResults(imageFiles, combinedCsv, results) {
     
     // Store and display CSV
     csvData = combinedCsv;
-    displayCSVTable(csvData);
+    displayCSVTableWithValidation(csvData);
     
     // Show results
     document.getElementById('results').style.display = 'block';
@@ -906,7 +859,7 @@ function displaySavedResults(imageData, csvContent) {
     
     // Clean and display CSV
     csvData = csvContent.trim();
-    displayCSVTable(csvData);
+    displayCSVTableWithValidation(csvData);
     
     // Show results
     document.getElementById('results').style.display = 'block';
@@ -1571,7 +1524,7 @@ function rebuildTable() {
         row.map(cell => `"${cell}"`).join(',')
     ).join('\n');
     
-    displayCSVTable(csvContent);
+    displayCSVTableWithValidation(csvContent);
 }
 
 /**
@@ -1755,3 +1708,353 @@ window.addEventListener('beforeunload', function(e) {
         e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
     }
 });
+
+/**
+ * Validate table data and highlight inconsistent cells
+ */
+function validateTableData() {
+    if (!csvDataArray || csvDataArray.length < 3) {
+        console.log('Insufficient data for validation');
+        return;
+    }
+
+    // Clear existing validation highlights
+    clearValidationHighlights();
+
+    const issues = [];
+    const columnCount = csvDataArray[0].length;
+
+    // Check each column for consistency
+    for (let colIndex = 0; colIndex < columnCount; colIndex++) {
+        const columnIssues = validateColumn(colIndex);
+        issues.push(...columnIssues);
+    }
+
+    // Apply highlights to problematic cells
+    highlightIssues(issues);
+
+    // Show validation summary
+    showValidationSummary(issues);
+
+    return issues;
+}
+
+/**
+ * Validate a specific column for data consistency
+ * @param {number} colIndex - Column index to validate
+ * @returns {Array} Array of issue objects
+ */
+function validateColumn(colIndex) {
+    const issues = [];
+    const columnData = [];
+    
+    // Extract numerical data from the column (skip header)
+    for (let rowIndex = 1; rowIndex < csvDataArray.length; rowIndex++) {
+        const cellValue = csvDataArray[rowIndex][colIndex];
+        const numValue = parseFloat(cellValue);
+        
+        if (!isNaN(numValue)) {
+            columnData.push({
+                value: numValue,
+                row: rowIndex,
+                col: colIndex,
+                originalValue: cellValue
+            });
+        }
+    }
+
+    // Need at least 3 numerical values to calculate deltas
+    if (columnData.length < 3) {
+        return issues;
+    }
+
+    // Calculate deltas between consecutive values
+    const deltas = [];
+    for (let i = 0; i < columnData.length - 1; i++) {
+        const delta = Math.abs(columnData[i + 1].value - columnData[i].value);
+        deltas.push({
+            delta: delta,
+            fromRow: columnData[i].row,
+            toRow: columnData[i + 1].row,
+            fromValue: columnData[i].value,
+            toValue: columnData[i + 1].value
+        });
+    }
+
+    if (deltas.length === 0) return issues;
+
+    // Calculate median delta
+    const sortedDeltas = deltas.map(d => d.delta).sort((a, b) => a - b);
+    const medianDelta = calculateMedian(sortedDeltas);
+    
+    // Define tolerance (you can adjust this threshold)
+    const tolerance = medianDelta * 0.5; // 50% tolerance
+    const minTolerance = 0.01; // Minimum absolute tolerance
+    const finalTolerance = Math.max(tolerance, minTolerance);
+
+    // Find outlier deltas
+    deltas.forEach(deltaInfo => {
+        const deviation = Math.abs(deltaInfo.delta - medianDelta);
+        
+        if (deviation > finalTolerance) {
+            // Determine which cell is more likely to be the issue
+            // For simplicity, we'll flag the "to" cell (the second value in the pair)
+            issues.push({
+                type: 'inconsistent_delta',
+                row: deltaInfo.toRow,
+                col: colIndex,
+                expectedDelta: medianDelta,
+                actualDelta: deltaInfo.delta,
+                deviation: deviation,
+                tolerance: finalTolerance,
+                fromValue: deltaInfo.fromValue,
+                toValue: deltaInfo.toValue,
+                suggestion: calculateSuggestedValue(deltaInfo.fromValue, medianDelta)
+            });
+        }
+    });
+
+    return issues;
+}
+
+/**
+ * Calculate median of an array
+ * @param {Array} values - Array of numbers
+ * @returns {number} Median value
+ */
+function calculateMedian(values) {
+    if (values.length === 0) return 0;
+    
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    
+    if (sorted.length % 2 === 0) {
+        return (sorted[mid - 1] + sorted[mid]) / 2;
+    } else {
+        return sorted[mid];
+    }
+}
+
+/**
+ * Calculate suggested value based on previous value and median delta
+ * @param {number} fromValue - Previous value
+ * @param {number} medianDelta - Median delta
+ * @returns {number} Suggested value
+ */
+function calculateSuggestedValue(fromValue, medianDelta) {
+    // This is a simple approach - you might want to make it more sophisticated
+    // For now, we'll suggest the value that would maintain the median delta
+    return fromValue + medianDelta;
+}
+
+/**
+ * Clear existing validation highlights
+ */
+function clearValidationHighlights() {
+    const table = document.getElementById('editableTable');
+    if (!table) return;
+
+    // Remove validation classes
+    table.querySelectorAll('.validation-error, .validation-warning').forEach(cell => {
+        cell.classList.remove('validation-error', 'validation-warning');
+        
+        // Remove validation indicators
+        const indicator = cell.querySelector('.validation-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    });
+}
+
+/**
+ * Highlight cells with issues
+ * @param {Array} issues - Array of issue objects
+ */
+function highlightIssues(issues) {
+    const table = document.getElementById('editableTable');
+    if (!table) return;
+
+    issues.forEach(issue => {
+        const cell = table.querySelector(`td[data-row="${issue.row}"][data-col="${issue.col}"]`);
+        if (cell) {
+            // Add validation error class
+            cell.classList.add('validation-error');
+            
+            // Add validation indicator
+            const indicator = document.createElement('div');
+            indicator.className = 'validation-indicator';
+            indicator.title = createTooltipText(issue);
+            indicator.innerHTML = '⚠️';
+            
+            cell.appendChild(indicator);
+        }
+    });
+}
+
+/**
+ * Create tooltip text for validation issues
+ * @param {Object} issue - Issue object
+ * @returns {string} Tooltip text
+ */
+function createTooltipText(issue) {
+    return `Inconsistent value detected!\n` +
+           `Expected delta: ~${issue.expectedDelta.toFixed(2)}\n` +
+           `Actual delta: ${issue.actualDelta.toFixed(2)}\n` +
+           `Deviation: ${issue.deviation.toFixed(2)}\n` +
+           `Suggested value: ${issue.suggestion.toFixed(2)}\n` +
+           `From: ${issue.fromValue} → To: ${issue.toValue}`;
+}
+
+/**
+ * Show validation summary
+ * @param {Array} issues - Array of issues found
+ */
+function showValidationSummary(issues) {
+    // Remove existing summary
+    const existingSummary = document.getElementById('validationSummary');
+    if (existingSummary) {
+        existingSummary.remove();
+    }
+
+    const container = document.getElementById('csvTableContainer');
+    if (!container) return;
+
+    const summaryDiv = document.createElement('div');
+    summaryDiv.id = 'validationSummary';
+    summaryDiv.className = 'validation-summary';
+
+    if (issues.length === 0) {
+        summaryDiv.innerHTML = `
+            <div class="validation-success">
+                ✅ <strong>Data Validation Complete</strong>
+                <p>No consistency issues found in the data.</p>
+            </div>
+        `;
+    } else {
+        const issuesByColumn = groupIssuesByColumn(issues);
+        
+        summaryDiv.innerHTML = `
+            <div class="validation-issues">
+                <h4>⚠️ Data Validation Issues Found (${issues.length})</h4>
+                ${Object.entries(issuesByColumn).map(([colIndex, colIssues]) => `
+                    <div class="column-issues">
+                        <strong>Column ${parseInt(colIndex) + 1} (${csvDataArray[0][colIndex]}):</strong>
+                        <ul>
+                            ${colIssues.map(issue => `
+                                <li>
+                                    Row ${issue.row + 1}: Value ${issue.toValue} 
+                                    (expected ~${issue.suggestion.toFixed(2)})
+                                    <button class="fix-btn" onclick="applyQuickFix(${issue.row}, ${issue.col}, ${issue.suggestion})">
+                                        Quick Fix
+                                    </button>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `).join('')}
+                <div class="validation-actions">
+                    <button class="table-control-btn secondary" onclick="clearValidationHighlights()">
+                        Clear Highlights
+                    </button>
+                    <button class="table-control-btn" onclick="validateTableData()">
+                        Re-validate
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // Insert at the top of the container
+    container.insertBefore(summaryDiv, container.firstChild);
+}
+
+/**
+ * Group issues by column
+ * @param {Array} issues - Array of issues
+ * @returns {Object} Issues grouped by column index
+ */
+function groupIssuesByColumn(issues) {
+    return issues.reduce((groups, issue) => {
+        const colIndex = issue.col;
+        if (!groups[colIndex]) {
+            groups[colIndex] = [];
+        }
+        groups[colIndex].push(issue);
+        return groups;
+    }, {});
+}
+
+/**
+ * Apply quick fix to a cell
+ * @param {number} row - Row index
+ * @param {number} col - Column index
+ * @param {number} suggestedValue - Suggested value
+ */
+function applyQuickFix(row, col, suggestedValue) {
+    if (confirm(`Replace value in Row ${row + 1}, Column ${col + 1} with ${suggestedValue.toFixed(2)}?`)) {
+        // Update data array
+        csvDataArray[row][col] = suggestedValue.toFixed(2);
+        
+        // Update cell display
+        const table = document.getElementById('editableTable');
+        const cell = table.querySelector(`td[data-row="${row}"][data-col="${col}"]`);
+        if (cell) {
+            cell.textContent = suggestedValue.toFixed(2);
+            
+            // Add edit indicator
+            const indicator = document.createElement('div');
+            indicator.className = 'edit-indicator';
+            cell.appendChild(indicator);
+        }
+        
+        // Mark as changed
+        hasUnsavedChanges = true;
+        updateEditStatus();
+        updateCSVData();
+        
+        // Re-validate to update highlights
+        setTimeout(() => validateTableData(), 100);
+    }
+}
+
+/**
+ * Enhanced displayCSVTable function with automatic validation
+ * Update your existing displayCSVTable function to include this
+ */
+function displayCSVTableWithValidation(csvContent) {
+    // Call the existing displayCSVTable function
+    displayCSVTable(csvContent);
+    
+    // Add validation button to controls
+    addValidationButton();
+    
+    // Automatically run validation after a short delay
+    setTimeout(() => {
+        validateTableData();
+    }, 500);
+}
+
+/**
+ * Add validation button to table controls
+ */
+function addValidationButton() {
+    const controlsDiv = document.querySelector('.table-controls');
+    if (!controlsDiv) return;
+
+    // Check if validation button already exists
+    if (controlsDiv.querySelector('#validateBtn')) return;
+
+    const validateBtn = document.createElement('button');
+    validateBtn.id = 'validateBtn';
+    validateBtn.className = 'table-control-btn secondary';
+    validateBtn.innerHTML = '🔍 Validate Data';
+    validateBtn.addEventListener('click', validateTableData);
+
+    // Insert after the export button
+    const exportBtn = controlsDiv.querySelector('#exportBtn');
+    if (exportBtn) {
+        exportBtn.parentNode.insertBefore(validateBtn, exportBtn.nextSibling);
+    } else {
+        controlsDiv.appendChild(validateBtn);
+    }
+}
