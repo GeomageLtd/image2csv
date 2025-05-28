@@ -282,7 +282,7 @@ function combineCSVResults(results) {
     }
     
     let combinedRows = [];
-    let headers = null;
+    let referenceHeaders = null;
     
     successfulResults.forEach((result, index) => {
         // Clean CSV content
@@ -297,18 +297,38 @@ function combineCSVResults(results) {
         );
         
         if (index === 0) {
-            // Use first file's headers
-            headers = csvRows[0];
-            combinedRows.push(headers);
+            // Use first file's headers as reference
+            referenceHeaders = csvRows[0];
+            combinedRows.push(referenceHeaders);
             
             // Add data rows from first file
             if (csvRows.length > 1) {
                 combinedRows.push(...csvRows.slice(1));
             }
         } else {
-            // For subsequent files, skip headers and add data rows
-            if (csvRows.length > 1) {
-                combinedRows.push(...csvRows.slice(1));
+            // For subsequent files, check if first row is headers
+            let startIndex = 0;
+            
+            if (csvRows.length > 0) {
+                const firstRow = csvRows[0];
+                
+                // Check if first row looks like headers by comparing with reference
+                const isHeaderRow = false;//isLikelyHeaderRow(firstRow, referenceHeaders, csvRows);
+                
+                if (isHeaderRow) {
+                    // Skip the header row
+                    startIndex = 1;
+                    console.log(`Skipping header row in file ${index + 1}:`, firstRow);
+                } else {
+                    // First row contains data, start from beginning
+                    startIndex = 0;
+                    console.log(`No header detected in file ${index + 1}, including all rows`);
+                }
+                
+                // Add data rows from current file
+                if (csvRows.length > startIndex) {
+                    combinedRows.push(...csvRows.slice(startIndex));
+                }
             }
         }
     });
@@ -317,6 +337,86 @@ function combineCSVResults(results) {
     return combinedRows.map(row => 
         row.map(cell => `"${cell}"`).join(',')
     ).join('\n');
+}
+
+/**
+ * Determine if a row is likely to be a header row
+ * @param {Array} row - The row to check
+ * @param {Array} referenceHeaders - Headers from the first file
+ * @param {Array} allRows - All rows from the current file
+ * @returns {boolean} True if the row is likely a header
+ */
+function isLikelyHeaderRow(row, referenceHeaders, allRows) {
+    // If we don't have reference headers, assume first row is header
+    if (!referenceHeaders || !Array.isArray(referenceHeaders)) {
+        return true;
+    }
+    
+    // If the row length doesn't match reference headers, it's probably not a header
+    if (row.length !== referenceHeaders.length) {
+        return false;
+    }
+    
+    // Check for exact match with reference headers
+    const exactMatch = row.every((cell, index) => {
+        return cell.toLowerCase().trim() === referenceHeaders[index].toLowerCase().trim();
+    });
+    if (exactMatch) {
+        return true;
+    }
+    
+    // Check if this row contains mostly non-numeric values while subsequent rows are numeric
+    // This helps identify cases where headers are descriptive text
+    if (allRows.length > 1) {
+        const isFirstRowMostlyText = row.some(cell => isNaN(parseFloat(cell)) && cell.trim() !== '');
+        const isSecondRowMostlyNumeric = allRows[1].some(cell => !isNaN(parseFloat(cell)));
+        
+        if (isFirstRowMostlyText && isSecondRowMostlyNumeric) {
+            return true;
+        }
+    }
+    
+    // Check if the row contains typical header patterns
+    const headerPatterns = /^(column|col|header|field|name|time|date|value|data|row|#)/i;
+    const hasHeaderPattern = row.some(cell => headerPatterns.test(cell.toString()));
+    
+    if (hasHeaderPattern) {
+        return true;
+    }
+    
+    // Check if all cells in the row look like column identifiers
+    // This handles cases like "1", "2", "3" or "A", "B", "C" as headers
+    const allSimpleIdentifiers = row.every(cell => {
+        const cellStr = cell.toString().trim();
+        // Check for simple numeric sequence (1, 2, 3, etc.)
+        if (/^\d+$/.test(cellStr)) return true;
+        // Check for single letters (A, B, C, etc.)
+        if (/^[A-Za-z]$/.test(cellStr)) return true;
+        // Check for short descriptive text
+        if (cellStr.length <= 20 && !/^\d+\.?\d*$/.test(cellStr)) return true;
+        return false;
+    });
+    
+    // If we have multiple rows and first row is all simple identifiers
+    // while other rows contain more complex data, treat first as header
+    if (allSimpleIdentifiers && allRows.length > 1) {
+        const secondRowComplexity = allRows[1].some(cell => {
+            const cellStr = cell.toString().trim();
+            return cellStr.length > 20 || /^\d+\.\d+$/.test(cellStr);
+        });
+        
+        if (secondRowComplexity) {
+            return true;
+        }
+    }
+    
+    // Default to treating first row as header if we're unsure and it's reasonable
+    // This is safer than accidentally including headers as data
+    if (allRows.length > 1) {
+        return true;
+    }
+    
+    return false;
 }
 
 /**
