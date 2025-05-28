@@ -300,3 +300,125 @@ process.on('SIGINT', async () => {
     await saveResults();
     process.exit(0);
 });
+
+// Update an existing result's CSV data
+app.put('/api/update-result/:id', async (req, res) => {
+    try {
+        const resultId = req.params.id;
+        const { csvData } = req.body;
+        
+        const result = resultsStorage[resultId];
+        
+        if (!result) {
+            return res.status(404).json({ error: 'Result not found' });
+        }
+        
+        if (!csvData) {
+            return res.status(400).json({ error: 'CSV data is required' });
+        }
+        
+        // Update CSV file
+        await fs.writeFile(result.csvPath, csvData);
+        
+        // Update timestamp to reflect the edit
+        resultsStorage[resultId].lastModified = new Date().toISOString();
+        
+        // Save to file
+        await saveResults();
+        
+        res.json({ 
+            success: true, 
+            message: 'Result updated successfully',
+            lastModified: resultsStorage[resultId].lastModified
+        });
+        
+    } catch (error) {
+        console.error('Error updating result:', error);
+        res.status(500).json({ error: 'Failed to update result' });
+    }
+});
+
+// Enhanced save result endpoint to support batch processing
+app.post('/api/save-result', async (req, res) => {
+    try {
+        const { imageData, csvData, prompt, label, timestamp } = req.body;
+        
+        if (!imageData || !csvData) {
+            return res.status(400).json({ error: 'Missing required data' });
+        }
+
+        const resultId = uuidv4();
+        const isBatch = Array.isArray(imageData);
+        
+        if (isBatch) {
+            // Handle multiple images
+            const imagePaths = [];
+            const imageExtensions = [];
+            
+            for (let i = 0; i < imageData.length; i++) {
+                const imgData = imageData[i];
+                const imageBuffer = Buffer.from(imgData.split(',')[1], 'base64');
+                const imageExtension = imgData.split(';')[0].split('/')[1];
+                const imagePath = `data/images/${resultId}_${i}.${imageExtension}`;
+                
+                await fs.writeFile(imagePath, imageBuffer);
+                imagePaths.push(imagePath);
+                imageExtensions.push(imageExtension);
+            }
+            
+            // Save CSV data
+            const csvPath = `data/csv/${resultId}.csv`;
+            await fs.writeFile(csvPath, csvData);
+            
+            // Store metadata for batch
+            resultsStorage[resultId] = {
+                id: resultId,
+                timestamp: timestamp || new Date().toISOString(),
+                lastModified: new Date().toISOString(),
+                prompt: prompt,
+                label: label,
+                imagePaths: imagePaths,
+                imageExtensions: imageExtensions,
+                csvPath: csvPath,
+                isBatch: true,
+                imageCount: imageData.length
+            };
+        } else {
+            // Handle single image (existing logic)
+            const imageBuffer = Buffer.from(imageData.split(',')[1], 'base64');
+            const imageExtension = imageData.split(';')[0].split('/')[1];
+            const imagePath = `data/images/${resultId}.${imageExtension}`;
+            await fs.writeFile(imagePath, imageBuffer);
+            
+            // Save CSV data
+            const csvPath = `data/csv/${resultId}.csv`;
+            await fs.writeFile(csvPath, csvData);
+            
+            // Store metadata
+            resultsStorage[resultId] = {
+                id: resultId,
+                timestamp: timestamp || new Date().toISOString(),
+                lastModified: new Date().toISOString(),
+                prompt: prompt,
+                label: label,
+                imagePath: imagePath,
+                csvPath: csvPath,
+                imageExtension: imageExtension,
+                isBatch: false,
+                imageCount: 1
+            };
+        }
+        
+        // Save to file
+        await saveResults();
+        
+        res.json({ 
+            success: true, 
+            resultId: resultId,
+            shareUrl: `/result/${resultId}`
+        });
+    } catch (error) {
+        console.error('Error saving result:', error);
+        res.status(500).json({ error: 'Failed to save result' });
+    }
+});

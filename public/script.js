@@ -1138,3 +1138,620 @@ function displayImages(imageData, isBatch) {
         });
     }
 }
+
+// Global variables for table editing
+let csvDataArray = []; // 2D array representation of CSV data
+let hasUnsavedChanges = false;
+let currentEditingCell = null;
+
+/**
+ * Create and display CSV table with editing capabilities
+ * @param {string} csvContent - Raw CSV content
+ */
+function displayCSVTable(csvContent) {
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return;
+    
+    // Parse CSV into 2D array
+    csvDataArray = lines.map(line => 
+        line.split(',').map(cell => cell.trim().replace(/"/g, ''))
+    );
+    
+    const container = document.getElementById('csvTableContainer');
+    container.innerHTML = '';
+    
+    // Create table controls
+    const controlsDiv = createTableControls();
+    container.appendChild(controlsDiv);
+    
+    // Create edit status indicator
+    const statusDiv = document.createElement('div');
+    statusDiv.id = 'editStatus';
+    statusDiv.className = 'edit-status';
+    container.appendChild(statusDiv);
+    
+    // Create table
+    const table = document.createElement('table');
+    table.className = 'csv-table';
+    table.id = 'editableTable';
+    
+    // Create header
+    const thead = document.createElement('thead');
+    const headerTr = document.createElement('tr');
+    
+    csvDataArray[0].forEach((header, colIndex) => {
+        const th = document.createElement('th');
+        th.textContent = header;
+        th.dataset.col = colIndex;
+        headerTr.appendChild(th);
+    });
+    
+    thead.appendChild(headerTr);
+    table.appendChild(thead);
+    
+    // Create body with editable cells
+    const tbody = document.createElement('tbody');
+    
+    for (let rowIndex = 1; rowIndex < csvDataArray.length; rowIndex++) {
+        const row = csvDataArray[rowIndex];
+        const tr = document.createElement('tr');
+        tr.dataset.row = rowIndex;
+        
+        row.forEach((cell, colIndex) => {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            td.dataset.row = rowIndex;
+            td.dataset.col = colIndex;
+            td.setAttribute('tabindex', '0');
+            
+            // Add edit indicator
+            const indicator = document.createElement('div');
+            indicator.className = 'edit-indicator';
+            td.appendChild(indicator);
+            
+            // Add event listeners for editing
+            addCellEditListeners(td);
+            
+            tr.appendChild(td);
+        });
+        
+        tbody.appendChild(tr);
+    }
+    
+    table.appendChild(tbody);
+    container.appendChild(table);
+    
+    // Add keyboard navigation
+    addKeyboardNavigation(table);
+    
+    // Reset unsaved changes flag
+    hasUnsavedChanges = false;
+    updateEditStatus();
+}
+
+/**
+ * Create table controls (add/remove rows, save, etc.)
+ */
+function createTableControls() {
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'table-controls';
+    
+    controlsDiv.innerHTML = `
+        <button class="table-control-btn" id="addRowBtn">
+            ➕ Add Row
+        </button>
+        <button class="table-control-btn" id="addColBtn">
+            ➕ Add Column
+        </button>
+        <button class="table-control-btn danger" id="deleteRowBtn" disabled>
+            🗑️ Delete Row
+        </button>
+        <button class="table-control-btn danger" id="deleteColBtn" disabled>
+            🗑️ Delete Column
+        </button>
+        <button class="table-control-btn secondary" id="undoBtn" disabled>
+            ↶ Undo
+        </button>
+        <button class="table-control-btn success" id="saveChangesBtn" disabled>
+            💾 Save Changes
+        </button>
+        <button class="table-control-btn secondary" id="exportBtn">
+            📤 Export CSV
+        </button>
+    `;
+    
+    // Add event listeners
+    controlsDiv.querySelector('#addRowBtn').addEventListener('click', addNewRow);
+    controlsDiv.querySelector('#addColBtn').addEventListener('click', addNewColumn);
+    controlsDiv.querySelector('#deleteRowBtn').addEventListener('click', deleteSelectedRow);
+    controlsDiv.querySelector('#deleteColBtn').addEventListener('click', deleteSelectedColumn);
+    controlsDiv.querySelector('#saveChangesBtn').addEventListener('click', saveTableChanges);
+    controlsDiv.querySelector('#exportBtn').addEventListener('click', exportUpdatedCSV);
+    
+    return controlsDiv;
+}
+
+/**
+ * Add event listeners for cell editing
+ * @param {HTMLElement} cell - Table cell element
+ */
+function addCellEditListeners(cell) {
+    // Double-click to edit
+    cell.addEventListener('dblclick', function(e) {
+        e.stopPropagation();
+        startCellEdit(this);
+    });
+    
+    // Enter key to edit
+    cell.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !this.classList.contains('editing')) {
+            e.preventDefault();
+            startCellEdit(this);
+        }
+    });
+    
+    // Click to select (highlight row/column)
+    cell.addEventListener('click', function(e) {
+        if (!this.classList.contains('editing')) {
+            selectCell(this);
+        }
+    });
+}
+
+/**
+ * Start editing a cell
+ * @param {HTMLElement} cell - Cell to edit
+ */
+function startCellEdit(cell) {
+    // Finish any existing edit
+    if (currentEditingCell && currentEditingCell !== cell) {
+        finishCellEdit(currentEditingCell);
+    }
+    
+    const currentValue = cell.textContent;
+    cell.classList.add('editing');
+    currentEditingCell = cell;
+    
+    // Create input element
+    const input = document.createElement('textarea');
+    input.className = 'cell-input';
+    input.value = currentValue;
+    input.rows = 1;
+    
+    // Replace cell content with input
+    cell.innerHTML = '';
+    cell.appendChild(input);
+    
+    // Add edit indicator back
+    const indicator = document.createElement('div');
+    indicator.className = 'edit-indicator';
+    cell.appendChild(indicator);
+    
+    // Focus and select content
+    input.focus();
+    input.select();
+    
+    // Auto-resize textarea
+    autoResizeTextarea(input);
+    
+    // Add event listeners
+    input.addEventListener('blur', () => finishCellEdit(cell));
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            finishCellEdit(cell);
+            
+            // Move to next cell
+            const nextCell = getNextCell(cell);
+            if (nextCell) {
+                nextCell.focus();
+            }
+        } else if (e.key === 'Escape') {
+            cancelCellEdit(cell, currentValue);
+        } else if (e.key === 'Tab') {
+            e.preventDefault();
+            finishCellEdit(cell);
+            
+            // Move to next/previous cell
+            const nextCell = e.shiftKey ? getPreviousCell(cell) : getNextCell(cell);
+            if (nextCell) {
+                setTimeout(() => startCellEdit(nextCell), 10);
+            }
+        }
+    });
+    
+    input.addEventListener('input', () => autoResizeTextarea(input));
+}
+
+/**
+ * Finish editing a cell
+ * @param {HTMLElement} cell - Cell being edited
+ */
+function finishCellEdit(cell) {
+    const input = cell.querySelector('.cell-input');
+    if (!input) return;
+    
+    const newValue = input.value.trim();
+    const rowIndex = parseInt(cell.dataset.row);
+    const colIndex = parseInt(cell.dataset.col);
+    const oldValue = csvDataArray[rowIndex][colIndex];
+    
+    // Update data if changed
+    if (newValue !== oldValue) {
+        csvDataArray[rowIndex][colIndex] = newValue;
+        hasUnsavedChanges = true;
+        updateEditStatus();
+    }
+    
+    // Restore cell
+    cell.classList.remove('editing');
+    cell.innerHTML = newValue;
+    
+    // Add edit indicator back
+    const indicator = document.createElement('div');
+    indicator.className = 'edit-indicator';
+    cell.appendChild(indicator);
+    
+    currentEditingCell = null;
+    
+    // Update CSV data
+    updateCSVData();
+}
+
+/**
+ * Cancel cell editing
+ * @param {HTMLElement} cell - Cell being edited
+ * @param {string} originalValue - Original cell value
+ */
+function cancelCellEdit(cell, originalValue) {
+    cell.classList.remove('editing');
+    cell.innerHTML = originalValue;
+    
+    // Add edit indicator back
+    const indicator = document.createElement('div');
+    indicator.className = 'edit-indicator';
+    cell.appendChild(indicator);
+    
+    currentEditingCell = null;
+}
+
+/**
+ * Auto-resize textarea based on content
+ * @param {HTMLElement} textarea - Textarea element
+ */
+function autoResizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.max(20, textarea.scrollHeight) + 'px';
+}
+
+/**
+ * Select a cell (highlight row and column)
+ * @param {HTMLElement} cell - Cell to select
+ */
+function selectCell(cell) {
+    const table = document.getElementById('editableTable');
+    const rowIndex = parseInt(cell.dataset.row);
+    const colIndex = parseInt(cell.dataset.col);
+    
+    // Remove previous highlights
+    table.querySelectorAll('.highlight-row, .highlight-col').forEach(el => {
+        el.classList.remove('highlight-row', 'highlight-col');
+    });
+    
+    // Highlight current row
+    const currentRow = table.querySelector(`tr[data-row="${rowIndex}"]`);
+    if (currentRow) {
+        currentRow.classList.add('highlight-row');
+    }
+    
+    // Highlight current column
+    table.querySelectorAll(`td[data-col="${colIndex}"]`).forEach(td => {
+        td.classList.add('highlight-col');
+    });
+    
+    // Update control buttons
+    updateControlButtons(rowIndex, colIndex);
+}
+
+/**
+ * Update control button states
+ * @param {number} selectedRow - Selected row index
+ * @param {number} selectedCol - Selected column index
+ */
+function updateControlButtons(selectedRow, selectedCol) {
+    const deleteRowBtn = document.getElementById('deleteRowBtn');
+    const deleteColBtn = document.getElementById('deleteColBtn');
+    const saveBtn = document.getElementById('saveChangesBtn');
+    
+    deleteRowBtn.disabled = csvDataArray.length <= 2; // Keep at least header + 1 row
+    deleteColBtn.disabled = csvDataArray[0].length <= 1; // Keep at least 1 column
+    saveBtn.disabled = !hasUnsavedChanges;
+}
+
+/**
+ * Add new row to table
+ */
+function addNewRow() {
+    const colCount = csvDataArray[0].length;
+    const newRow = new Array(colCount).fill('');
+    
+    csvDataArray.push(newRow);
+    hasUnsavedChanges = true;
+    
+    // Rebuild table
+    rebuildTable();
+    updateEditStatus();
+}
+
+/**
+ * Add new column to table
+ */
+function addNewColumn() {
+    const columnName = prompt('Enter column name:', `Column ${csvDataArray[0].length + 1}`);
+    if (!columnName) return;
+    
+    // Add to each row
+    csvDataArray.forEach((row, index) => {
+        if (index === 0) {
+            row.push(columnName); // Header
+        } else {
+            row.push(''); // Empty data
+        }
+    });
+    
+    hasUnsavedChanges = true;
+    
+    // Rebuild table
+    rebuildTable();
+    updateEditStatus();
+}
+
+/**
+ * Delete selected row
+ */
+function deleteSelectedRow() {
+    const selectedRow = document.querySelector('.highlight-row');
+    if (!selectedRow) {
+        alert('Please select a row to delete');
+        return;
+    }
+    
+    const rowIndex = parseInt(selectedRow.dataset.row);
+    if (csvDataArray.length <= 2) {
+        alert('Cannot delete row. Table must have at least one data row.');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to delete this row?')) {
+        csvDataArray.splice(rowIndex, 1);
+        hasUnsavedChanges = true;
+        
+        // Rebuild table
+        rebuildTable();
+        updateEditStatus();
+    }
+}
+
+/**
+ * Delete selected column
+ */
+function deleteSelectedColumn() {
+    const selectedCol = document.querySelector('.highlight-col');
+    if (!selectedCol) {
+        alert('Please select a column to delete');
+        return;
+    }
+    
+    const colIndex = parseInt(selectedCol.dataset.col);
+    if (csvDataArray[0].length <= 1) {
+        alert('Cannot delete column. Table must have at least one column.');
+        return;
+    }
+    
+    const columnName = csvDataArray[0][colIndex];
+    if (confirm(`Are you sure you want to delete column "${columnName}"?`)) {
+        // Remove column from each row
+        csvDataArray.forEach(row => {
+            row.splice(colIndex, 1);
+        });
+        
+        hasUnsavedChanges = true;
+        
+        // Rebuild table
+        rebuildTable();
+        updateEditStatus();
+    }
+}
+
+/**
+ * Rebuild the entire table
+ */
+function rebuildTable() {
+    const csvContent = csvDataArray.map(row => 
+        row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
+    
+    displayCSVTable(csvContent);
+}
+
+/**
+ * Update CSV data from current table state
+ */
+function updateCSVData() {
+    csvData = csvDataArray.map(row => 
+        row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
+}
+
+/**
+ * Save table changes
+ */
+function saveTableChanges() {
+    updateCSVData();
+    hasUnsavedChanges = false;
+    updateEditStatus('saved');
+    
+    // Also update on server if we have a current result ID
+    if (currentResultId) {
+        updateResultOnServer();
+    }
+}
+
+/**
+ * Update result on server
+ */
+async function updateResultOnServer() {
+    try {
+        const response = await fetch(`/api/update-result/${currentResultId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                csvData: csvData
+            })
+        });
+        
+        if (response.ok) {
+            console.log('Result updated on server');
+        }
+    } catch (error) {
+        console.error('Error updating result on server:', error);
+    }
+}
+
+/**
+ * Export updated CSV
+ */
+function exportUpdatedCSV() {
+    updateCSVData();
+    
+    const blob = new Blob([csvData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'edited_data.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Update edit status indicator
+ * @param {string} status - Status type ('unsaved', 'saved', or null)
+ */
+function updateEditStatus(status = null) {
+    const statusDiv = document.getElementById('editStatus');
+    if (!statusDiv) return;
+    
+    statusDiv.className = 'edit-status';
+    
+    if (status === 'saved') {
+        statusDiv.className += ' show saved';
+        statusDiv.textContent = '✅ Changes saved successfully';
+        setTimeout(() => {
+            statusDiv.classList.remove('show');
+        }, 3000);
+    } else if (hasUnsavedChanges) {
+        statusDiv.className += ' show unsaved';
+        statusDiv.textContent = '⚠️ You have unsaved changes';
+    } else {
+        statusDiv.classList.remove('show');
+    }
+    
+    // Update save button
+    const saveBtn = document.getElementById('saveChangesBtn');
+    if (saveBtn) {
+        saveBtn.disabled = !hasUnsavedChanges;
+    }
+}
+
+/**
+ * Add keyboard navigation to table
+ * @param {HTMLElement} table - Table element
+ */
+function addKeyboardNavigation(table) {
+    table.addEventListener('keydown', function(e) {
+        const activeCell = document.activeElement;
+        if (!activeCell.matches('td[data-row][data-col]')) return;
+        
+        const row = parseInt(activeCell.dataset.row);
+        const col = parseInt(activeCell.dataset.col);
+        let newCell = null;
+        
+        switch (e.key) {
+            case 'ArrowUp':
+                e.preventDefault();
+                newCell = table.querySelector(`td[data-row="${row - 1}"][data-col="${col}"]`);
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                newCell = table.querySelector(`td[data-row="${row + 1}"][data-col="${col}"]`);
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                newCell = table.querySelector(`td[data-row="${row}"][data-col="${col - 1}"]`);
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                newCell = table.querySelector(`td[data-row="${row}"][data-col="${col + 1}"]`);
+                break;
+        }
+        
+        if (newCell) {
+            newCell.focus();
+            selectCell(newCell);
+        }
+    });
+}
+
+/**
+ * Get next cell for navigation
+ * @param {HTMLElement} cell - Current cell
+ * @returns {HTMLElement|null} Next cell
+ */
+function getNextCell(cell) {
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+    const table = document.getElementById('editableTable');
+    
+    // Try next column in same row
+    let nextCell = table.querySelector(`td[data-row="${row}"][data-col="${col + 1}"]`);
+    if (nextCell) return nextCell;
+    
+    // Try first column of next row
+    return table.querySelector(`td[data-row="${row + 1}"][data-col="0"]`);
+}
+
+/**
+ * Get previous cell for navigation
+ * @param {HTMLElement} cell - Current cell
+ * @returns {HTMLElement|null} Previous cell
+ */
+function getPreviousCell(cell) {
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+    const table = document.getElementById('editableTable');
+    
+    // Try previous column in same row
+    let prevCell = table.querySelector(`td[data-row="${row}"][data-col="${col - 1}"]`);
+    if (prevCell) return prevCell;
+    
+    // Try last column of previous row
+    const prevRow = row - 1;
+    if (prevRow >= 1) {
+        const lastCol = csvDataArray[0].length - 1;
+        return table.querySelector(`td[data-row="${prevRow}"][data-col="${lastCol}"]`);
+    }
+    
+    return null;
+}
+
+// Add warning for unsaved changes when leaving page
+window.addEventListener('beforeunload', function(e) {
+    if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+    }
+});
