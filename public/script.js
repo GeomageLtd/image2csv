@@ -86,18 +86,21 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         hideError();
         hideResults();
         
+        // Sort files alphabetically by filename
+        const sortedFiles = Array.from(imageFiles).sort((a, b) => a.name.localeCompare(b.name));
+        
         // Process multiple images
-        const results = await processBatchImages(apiKey, imageFiles, textPrompt);
+        const results = await processBatchImages(apiKey, sortedFiles, textPrompt);
         
         // Combine all CSV results
         const combinedCsv = combineCSVResults(results);
         
-        // Display results
-        displayBatchResults(imageFiles, combinedCsv, results);
+        // Display results with sorted files
+        displayBatchResults(sortedFiles, combinedCsv, results);
         
-        // Save combined result to server
+        // Save combined result to server with sorted files
         const imageDataArray = await Promise.all(
-            Array.from(imageFiles).map(file => fileToBase64(file))
+            sortedFiles.map(file => fileToBase64(file))
         );
         await saveResultToServer(imageDataArray, combinedCsv, textPrompt, finalLabel);
         
@@ -1964,8 +1967,8 @@ function showValidationSummary(issues) {
         `;
     }
 
-    // Insert at the top of the container
-    container.insertBefore(summaryDiv, container.firstChild);
+    // Append at the end of the container (after the table)
+    container.appendChild(summaryDiv);
 }
 
 /**
