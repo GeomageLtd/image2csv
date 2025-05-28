@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Result - Image to CSV Parser</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+        
+        .back-link:hover {
+            color: #764ba2;
+        }
+        
+        .result-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .result-meta {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        
+        .result-label {
+            color: #495057;
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+        
+        .result-prompt {
+            color: #6c757d;
+            font-style: italic;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Parser</a>
+        
+        <h1>🖼️ Shared Result</h1>
+        
+        <div class="result-info" id="resultInfo" style="display: none;">
+            <div class="result-meta" id="resultMeta"></div>
+            <div class="result-label" id="resultLabel"></div>
+            <div class="result-prompt" id="resultPrompt"></div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            Loading result... Please wait.
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div class="results" id="results">
+            <div class="results-container">
+                <div class="result-section image-section">
+                    <h3>📷 Original Image</h3>
+                    <img id="displayImage" class="uploaded-image" alt="Shared image">
+                </div>
+                
+                <div class="result-section csv-section">
+                    <h3>📊 Parsed CSV Data</h3>
+                    <button class="download-btn" id="downloadBtn">📥 Download CSV</button>
+                    <div id="csvTableContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let csvData = '';
+        
+        // Load result on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const pathParts = window.location.pathname.split('/');
+            const resultId = pathParts[pathParts.length - 1];
+            
+            console.log('Current URL:', window.location.href);
+            console.log('Path parts:', pathParts);
+            console.log('Result ID:', resultId);
+            
+            if (resultId && resultId !== 'result' && resultId.length > 0) {
+                loadResult(resultId);
+            } else {
+                showError('Invalid result URL - No result ID found in URL');
+                console.error('Invalid URL structure. Expected: /result/[id]');
+            }
+        });
+        
+        // Download CSV button handler
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            if (!csvData) return;
+            
+            const blob = new Blob([csvData], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'shared_result.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        });
+        
+        /**
+         * Load a specific result
+         * @param {string} resultId - Result ID to load
+         */
+        async function loadResult(resultId) {
+            try {
+                setLoading(true);
+                
+                const response = await fetch(`/api/result/${resultId}`);
+                if (!response.ok) {
+                    throw new Error('Result not found or has been deleted');
+                }
+                
+                const result = await response.json();
+                
+                // Display result info
+                displayResultInfo(result);
+                
+                // Display image
+                const displayImage = document.getElementById('displayImage');
+                displayImage.src = result.imageData;
+                
+                // Clean and store CSV data
+                csvData = result.csvData.trim();
+                
+                // Parse and display CSV
+                displayCSVTable(csvData);
+                
+                // Show results
+                document.getElementById('results').style.display = 'block';
+                
+            } catch (error) {
+                showError('Error loading result: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        /**
+         * Display result information
+         * @param {Object} result - Result data
+         */
+        function displayResultInfo(result) {
+            const resultInfo = document.getElementById('resultInfo');
+            const resultMeta = document.getElementById('resultMeta');
+            const resultLabel = document.getElementById('resultLabel');
+            const resultPrompt = document.getElementById('resultPrompt');
+            
+            const date = new Date(result.timestamp).toLocaleString();
+            resultMeta.textContent = `Processed on: ${date}`;
+            resultLabel.textContent = result.label || 'Untitled';
+            resultPrompt.textContent = `Prompt: "${result.prompt}"`;
+            
+            resultInfo.style.display = 'block';
+        }
+        
+        /**
+         * Create and display CSV table
+         * @param {string} csvContent - Raw CSV content
+         */
+        function displayCSVTable(csvContent) {
+            const lines = csvContent.split('\n').filter(line => line.trim());
+            if (lines.length === 0) return;
+            
+            const table = document.createElement('table');
+            table.className = 'csv-table';
+            
+            // Create header
+            const headerRow = lines[0].split(',').map(cell => cell.trim().replace(/"/g, ''));
+            const thead = document.createElement('thead');
+            const headerTr = document.createElement('tr');
+            
+            headerRow.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerTr.appendChild(th);
+            });
+            
+            thead.appendChild(headerTr);
+            table.appendChild(thead);
+            
+            // Create body
+            const tbody = document.createElement('tbody');
+            
+            for (let i = 1; i < lines.length; i++) {
+                const row = lines[i].split(',').map(cell => cell.trim().replace(/"/g, ''));
+                const tr = document.createElement('tr');
+                
+                row.forEach(cell => {
+                    const td = document.createElement('td');
+                    td.textContent = cell;
+                    tr.appendChild(td);
+                });
+                
+                tbody.appendChild(tr);
+            }
+            
+            table.appendChild(tbody);
+            
+            const container = document.getElementById('csvTableContainer');
+            container.innerHTML = '';
+            container.appendChild(table);
+        }
+        
+        // UI State Management Functions
+        
+        /**
+         * Set loading state
+         * @param {boolean} isLoading - Whether to show loading state
+         */
+        function setLoading(isLoading) {
+            const loading = document.getElementById('loading');
+            
+            if (isLoading) {
+                loading.style.display = 'block';
+            } else {
+                loading.style.display = 'none';
+            }
+        }
+        
+        /**
+         * Show error message
+         * @param {string} message - Error message to display
+         */
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        /**
+         * Hide error message
+         */
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

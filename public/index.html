@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to CSV Parser</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ Image to CSV Parser</h1>
+        
+        <div class="upload-section">
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="apiKey">OpenAI API Key:</label>
+                    <input type="password" id="apiKey" class="api-input" placeholder="Enter your OpenAI API key" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="imageFile">Select Image:</label>
+                    <input type="file" id="imageFile" accept="image/*" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="resultLabel">Result Label:</label>
+                    <input type="text" id="resultLabel" class="api-input" placeholder="Label for this result (auto-filled from filename)">
+                </div>
+                
+                <div class="form-group">
+                    <label for="textPrompt">Text Prompt:</label>
+                    <textarea id="textPrompt" placeholder="Enter your prompt here..." required>I'll send to you screenshot with tables. This table contains only numerical values. Please parse it and show it as table.</textarea>
+                </div>
+                
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    🚀 Process Image
+                </button>
+            </form>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            Processing your image... Please wait.
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div class="results" id="results">
+            <div class="results-container">
+                <div class="result-section image-section">
+                    <h3>📷 Uploaded Image</h3>
+                    <img id="displayImage" class="uploaded-image" alt="Uploaded image">
+                </div>
+                
+                <div class="result-section csv-section">
+                    <h3>📊 Parsed CSV Data</h3>
+                    <button class="download-btn" id="downloadBtn">📥 Download CSV</button>
+                    <div id="csvTableContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
