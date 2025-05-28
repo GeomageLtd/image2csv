@@ -69,12 +69,12 @@
         <div class="results" id="results">
             <div class="results-container">
                 <div class="result-section image-section">
-                    <h3>📷 Original Image</h3>
-                    <img id="displayImage" class="uploaded-image" alt="Shared image">
+                    <h3 id="imagesSectionTitle">📷 Images</h3>
+                    <div id="displayImages"></div>
                 </div>
                 
                 <div class="result-section csv-section">
-                    <h3>📊 Parsed CSV Data</h3>
+                    <h3>📊 Combined CSV Data</h3>
                     <button class="download-btn" id="downloadBtn">📥 Download CSV</button>
                     <div id="csvTableContainer"></div>
                 </div>
@@ -135,9 +135,8 @@
                 // Display result info
                 displayResultInfo(result);
                 
-                // Display image
-                const displayImage = document.getElementById('displayImage');
-                displayImage.src = result.imageData;
+                // Display images
+                displayImages(result.imageData, result.isBatch);
                 
                 // Clean and store CSV data
                 csvData = result.csvData.trim();
@@ -166,11 +165,45 @@
             const resultPrompt = document.getElementById('resultPrompt');
             
             const date = new Date(result.timestamp).toLocaleString();
-            resultMeta.textContent = `Processed on: ${date}`;
+            const imageText = result.isBatch ? `${result.imageCount} images` : '1 image';
+            resultMeta.textContent = `Processed on: ${date} • ${imageText}`;
             resultLabel.textContent = result.label || 'Untitled';
             resultPrompt.textContent = `Prompt: "${result.prompt}"`;
             
             resultInfo.style.display = 'block';
+        }
+        
+        /**
+         * Display images (updated for batch support)
+         * @param {string|Array} imageData - Single image or array of images
+         * @param {boolean} isBatch - Whether this is a batch result
+         */
+        function displayImages(imageData, isBatch) {
+            const title = document.getElementById('imagesSectionTitle');
+            const displayContainer = document.getElementById('displayImages');
+            
+            if (isBatch && Array.isArray(imageData)) {
+                // Batch display
+                title.textContent = `📷 Images (${imageData.length})`;
+                displayContainer.innerHTML = '';
+                displayContainer.className = 'image-preview';
+                
+                imageData.forEach((imgData, index) => {
+                    const imageItem = document.createElement('div');
+                    imageItem.className = 'preview-item';
+                    imageItem.innerHTML = `
+                        <img src="${imgData}" alt="Image ${index + 1}" class="preview-image">
+                        <div class="preview-label">Image ${index + 1}</div>
+                    `;
+                    displayContainer.appendChild(imageItem);
+                });
+            } else {
+                // Single image display
+                title.textContent = '📷 Image';
+                const singleImage = Array.isArray(imageData) ? imageData[0] : imageData;
+                displayContainer.innerHTML = `<img src="${singleImage}" class="uploaded-image" alt="Shared image">`;
+                displayContainer.className = '';
+            }
         }
         
         /**

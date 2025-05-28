@@ -1,0 +1,27 @@
+[Unit]
+Description=Image to CSV Parser Service
+Documentation=https://github.com/GeomageLtd/image2csv
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/image2csv/webapp
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=10
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=5
+SyslogIdentifier=image2csv
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/home/ubuntu/image2csv/webapp/data
+
+[Install]
+WantedBy=multi-user.target

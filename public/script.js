@@ -11,7 +11,9 @@ document.getElementById('downloadBtn').addEventListener('click', function() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-});let csvData = '';
+});
+
+let csvData = '';
 let currentResultId = null;
 
 // Check for result ID in URL on page load
@@ -27,13 +29,31 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Auto-fill label when file is selected
-document.getElementById('imageFile').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        // Extract filename without extension as default label
-        const filename = file.name;
-        const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
-        document.getElementById('resultLabel').value = nameWithoutExt;
+document.getElementById('imageFiles').addEventListener('change', function(e) {
+    const files = e.target.files;
+    const fileInfo = document.getElementById('fileInfo');
+    const fileCount = document.getElementById('fileCount');
+    
+    if (files.length > 0) {
+        fileInfo.style.display = 'block';
+        fileCount.textContent = `${files.length} file${files.length > 1 ? 's' : ''} selected`;
+        
+        // Generate default label based on file count and first filename
+        const firstFile = files[0];
+        let defaultLabel;
+        
+        if (files.length === 1) {
+            const nameWithoutExt = firstFile.name.substring(0, firstFile.name.lastIndexOf('.')) || firstFile.name;
+            defaultLabel = nameWithoutExt;
+        } else {
+            const baseName = firstFile.name.substring(0, firstFile.name.lastIndexOf('.')) || firstFile.name;
+            defaultLabel = `${baseName} + ${files.length - 1} more`;
+        }
+        
+        document.getElementById('resultLabel').value = defaultLabel;
+    } else {
+        fileInfo.style.display = 'none';
+        document.getElementById('resultLabel').value = '';
     }
 });
 
@@ -42,102 +62,343 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     e.preventDefault();
     
     const apiKey = document.getElementById('apiKey').value;
-    const imageFile = document.getElementById('imageFile').files[0];
+    const imageFiles = document.getElementById('imageFiles').files;
     const textPrompt = document.getElementById('textPrompt').value;
     const resultLabel = document.getElementById('resultLabel').value.trim();
     
-    if (!apiKey || !imageFile || !textPrompt) {
-        showError('Please fill in all fields');
+    if (!apiKey || imageFiles.length === 0 || !textPrompt) {
+        showError('Please fill in all fields and select at least one image');
         return;
     }
     
-    // Use filename as fallback if no label provided
-    const finalLabel = resultLabel || (imageFile.name.substring(0, imageFile.name.lastIndexOf('.')) || imageFile.name);
-    
-    setLoading(true);
-    hideError();
-    hideResults();
+    // Generate final label
+    let finalLabel = resultLabel;
+    if (!finalLabel) {
+        if (imageFiles.length === 1) {
+            finalLabel = imageFiles[0].name.substring(0, imageFiles[0].name.lastIndexOf('.')) || imageFiles[0].name;
+        } else {
+            finalLabel = `Batch of ${imageFiles.length} images`;
+        }
+    }
     
     try {
-        // Convert image to base64
-        const base64Image = await fileToBase64(imageFile);
+        setLoading(true);
+        hideError();
+        hideResults();
         
-        // Make API call to OpenAI
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: "gpt-4o",
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            {
-                                type: "text",
-                                text: textPrompt + "\n\nPlease return the data in CSV format."
-                            },
-                            {
-                                type: "image_url",
-                                image_url: {
-                                    url: base64Image
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens: 4000
-            })
-        });
+        // Process multiple images
+        const results = await processBatchImages(apiKey, imageFiles, textPrompt);
         
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || 'API request failed');
-        }
-        
-        const data = await response.json();
-        const csvContent = data.choices[0].message.content;
+        // Combine all CSV results
+        const combinedCsv = combineCSVResults(results);
         
         // Display results
-        displayResults(imageFile, csvContent);
+        displayBatchResults(imageFiles, combinedCsv, results);
         
-        // Save result to server
-        await saveResultToServer(base64Image, csvContent, textPrompt, finalLabel);
+        // Save combined result to server
+        const imageDataArray = await Promise.all(
+            Array.from(imageFiles).map(file => fileToBase64(file))
+        );
+        await saveResultToServer(imageDataArray, combinedCsv, textPrompt, finalLabel);
         
     } catch (error) {
         showError('Error: ' + error.message);
     } finally {
         setLoading(false);
+        hideBatchProgress();
     }
 });
 
 /**
- * Save result to server
- * @param {string} imageData - Base64 image data
+ * Process multiple images in batch
+ * @param {string} apiKey - OpenAI API key
+ * @param {FileList} imageFiles - Array of image files
+ * @param {string} textPrompt - User prompt
+ * @returns {Promise<Array>} Array of processing results
+ */
+async function processBatchImages(apiKey, imageFiles, textPrompt) {
+    const results = [];
+    const totalFiles = imageFiles.length;
+    
+    showBatchProgress();
+    updateProgress(0, totalFiles, 'Starting batch processing...');
+    
+    // Create preview for all images
+    await createImagePreviews(imageFiles);
+    
+    for (let i = 0; i < totalFiles; i++) {
+        const file = imageFiles[i];
+        updateImageStatus(i, 'processing');
+        updateProgress(i, totalFiles, `Processing ${file.name}...`);
+        
+        try {
+            // Convert image to base64
+            const base64Image = await fileToBase64(file);
+            
+            // Make API call to OpenAI
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o",
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: textPrompt + "\n\nPlease return the data in CSV format."
+                                },
+                                {
+                                    type: "image_url",
+                                    image_url: {
+                                        url: base64Image
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens: 4000
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || 'API request failed');
+            }
+            
+            const data = await response.json();
+            const csvContent = data.choices[0].message.content;
+            
+            results.push({
+                filename: file.name,
+                csvContent: csvContent,
+                imageData: base64Image,
+                success: true
+            });
+            
+            updateImageStatus(i, 'complete');
+            
+        } catch (error) {
+            console.error(`Error processing ${file.name}:`, error);
+            results.push({
+                filename: file.name,
+                error: error.message,
+                success: false
+            });
+            
+            updateImageStatus(i, 'error');
+        }
+        
+        // Small delay between requests to avoid rate limiting
+        if (i < totalFiles - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+    
+    updateProgress(totalFiles, totalFiles, 'Processing complete!');
+    return results;
+}
+
+/**
+ * Create image previews for batch processing
+ * @param {FileList} imageFiles - Array of image files
+ */
+async function createImagePreviews(imageFiles) {
+    const previewContainer = document.getElementById('imagePreview');
+    previewContainer.innerHTML = '';
+    
+    for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        const imageUrl = URL.createObjectURL(file);
+        
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item';
+        previewItem.innerHTML = `
+            <div class="processing-status status-pending" id="status-${i}">Pending</div>
+            <img src="${imageUrl}" alt="${file.name}" class="preview-image">
+            <div class="preview-label">${file.name}</div>
+        `;
+        
+        previewContainer.appendChild(previewItem);
+    }
+}
+
+/**
+ * Update processing status for a specific image
+ * @param {number} index - Image index
+ * @param {string} status - Status (pending, processing, complete, error)
+ */
+function updateImageStatus(index, status) {
+    const statusElement = document.getElementById(`status-${index}`);
+    if (statusElement) {
+        statusElement.className = `processing-status status-${status}`;
+        statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    }
+}
+
+/**
+ * Show batch progress UI
+ */
+function showBatchProgress() {
+    document.getElementById('batchProgress').style.display = 'block';
+}
+
+/**
+ * Hide batch progress UI
+ */
+function hideBatchProgress() {
+    document.getElementById('batchProgress').style.display = 'none';
+}
+
+/**
+ * Update progress bar and text
+ * @param {number} current - Current progress
+ * @param {number} total - Total items
+ * @param {string} message - Progress message
+ */
+function updateProgress(current, total, message) {
+    const percentage = (current / total) * 100;
+    document.getElementById('progressFill').style.width = `${percentage}%`;
+    document.getElementById('progressText').textContent = `${message} (${current}/${total})`;
+}
+
+/**
+ * Combine multiple CSV results into one
+ * @param {Array} results - Array of processing results
+ * @returns {string} Combined CSV content
+ */
+function combineCSVResults(results) {
+    const successfulResults = results.filter(r => r.success);
+    
+    if (successfulResults.length === 0) {
+        throw new Error('No images were successfully processed');
+    }
+    
+    let combinedRows = [];
+    let headers = null;
+    
+    successfulResults.forEach((result, index) => {
+        // Clean CSV content
+        const cleanCsv = result.csvContent.replace(/```csv\n?/g, '').replace(/```\n?/g, '').trim();
+        const lines = cleanCsv.split('\n').filter(line => line.trim());
+        
+        if (lines.length === 0) return;
+        
+        // Parse CSV lines
+        const csvRows = lines.map(line => 
+            line.split(',').map(cell => cell.trim().replace(/"/g, ''))
+        );
+        
+        if (index === 0) {
+            // Use first file's headers
+            headers = csvRows[0];
+            combinedRows.push(headers);
+            
+            // Add data rows from first file
+            if (csvRows.length > 1) {
+                combinedRows.push(...csvRows.slice(1));
+            }
+        } else {
+            // For subsequent files, skip headers and add data rows
+            if (csvRows.length > 1) {
+                combinedRows.push(...csvRows.slice(1));
+            }
+        }
+    });
+    
+    // Convert back to CSV format
+    return combinedRows.map(row => 
+        row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
+}
+
+/**
+ * Display batch processing results
+ * @param {FileList} imageFiles - Original image files
+ * @param {string} combinedCsv - Combined CSV content
+ * @param {Array} results - Processing results
+ */
+function displayBatchResults(imageFiles, combinedCsv, results) {
+    // Update section title
+    const title = document.getElementById('imagesSectionTitle');
+    title.textContent = `📷 Uploaded Images (${imageFiles.length})`;
+    
+    // Display images
+    const displayContainer = document.getElementById('displayImages');
+    displayContainer.innerHTML = '';
+    displayContainer.className = 'image-preview';
+    
+    Array.from(imageFiles).forEach((file, index) => {
+        const imageUrl = URL.createObjectURL(file);
+        const result = results[index];
+        
+        const imageItem = document.createElement('div');
+        imageItem.className = 'preview-item';
+        imageItem.innerHTML = `
+            <img src="${imageUrl}" alt="${file.name}" class="preview-image">
+            <div class="preview-label">
+                ${file.name} 
+                ${result.success ? '✅' : '❌'}
+            </div>
+        `;
+        
+        displayContainer.appendChild(imageItem);
+    });
+    
+    // Store and display CSV
+    csvData = combinedCsv;
+    displayCSVTable(csvData);
+    
+    // Show results
+    document.getElementById('results').style.display = 'block';
+}
+
+/**
+ * Save result to server (FIXED VERSION)
+ * @param {string|Array} imageData - Base64 image data or array of image data
  * @param {string} csvContent - CSV content
  * @param {string} prompt - User prompt
- * @param {string} label - User-defined label
+ * @param {string} label - Result label
  */
 async function saveResultToServer(imageData, csvContent, prompt, label) {
     try {
+        console.log('Saving result to server...', {
+            imageCount: Array.isArray(imageData) ? imageData.length : 1,
+            csvLength: csvContent.length,
+            label: label
+        });
+        
+        const requestData = {
+            imageData: imageData, // This should be an array for batch, single string for single
+            csvData: csvContent.replace(/```csv\n?/g, '').replace(/```\n?/g, '').trim(),
+            prompt: prompt,
+            label: label,
+            timestamp: new Date().toISOString()
+        };
+        
+        console.log('Request data prepared:', {
+            hasImageData: !!requestData.imageData,
+            imageDataType: Array.isArray(requestData.imageData) ? 'array' : 'string',
+            csvDataLength: requestData.csvData.length
+        });
+        
         const response = await fetch('/api/save-result', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                imageData: imageData,
-                csvData: csvContent.replace(/```csv\n?/g, '').replace(/```\n?/g, '').trim(),
-                prompt: prompt,
-                label: label,
-                timestamp: new Date().toISOString()
-            })
+            body: JSON.stringify(requestData)
         });
+        
+        console.log('Server response status:', response.status);
         
         if (response.ok) {
             const result = await response.json();
+            console.log('Result saved successfully:', result);
             currentResultId = result.resultId;
             
             // Update URL with result ID
@@ -150,9 +411,14 @@ async function saveResultToServer(imageData, csvContent, prompt, label) {
             
             // Refresh results list
             loadResultsList();
+        } else {
+            const errorData = await response.json();
+            console.error('Server error response:', errorData);
+            throw new Error(errorData.error || 'Failed to save result');
         }
     } catch (error) {
         console.error('Error saving result:', error);
+        showError('Failed to save result: ' + error.message);
     }
 }
 
@@ -197,19 +463,42 @@ async function loadSavedResult(resultId) {
 }
 
 /**
- * Display saved results (similar to displayResults but for loaded data)
- * @param {string} imageData - Base64 image data
+ * Display saved results (updated for batch support)
+ * @param {string} imageData - Base64 image data or array
  * @param {string} csvContent - CSV content
  */
 function displaySavedResults(imageData, csvContent) {
-    // Display image
-    const displayImage = document.getElementById('displayImage');
-    displayImage.src = imageData;
+    // Handle both single image and batch display
+    if (Array.isArray(imageData)) {
+        // Batch display
+        const title = document.getElementById('imagesSectionTitle');
+        title.textContent = `📷 Saved Images (${imageData.length})`;
+        
+        const displayContainer = document.getElementById('displayImages');
+        displayContainer.innerHTML = '';
+        displayContainer.className = 'image-preview';
+        
+        imageData.forEach((imgData, index) => {
+            const imageItem = document.createElement('div');
+            imageItem.className = 'preview-item';
+            imageItem.innerHTML = `
+                <img src="${imgData}" alt="Saved image ${index + 1}" class="preview-image">
+                <div class="preview-label">Image ${index + 1}</div>
+            `;
+            displayContainer.appendChild(imageItem);
+        });
+    } else {
+        // Single image display
+        const title = document.getElementById('imagesSectionTitle');
+        title.textContent = '📷 Uploaded Image';
+        
+        const displayContainer = document.getElementById('displayImages');
+        displayContainer.innerHTML = `<img src="${imageData}" class="uploaded-image" alt="Saved image">`;
+        displayContainer.className = '';
+    }
     
-    // Clean CSV content
+    // Clean and display CSV
     csvData = csvContent.trim();
-    
-    // Parse and display CSV
     displayCSVTable(csvData);
     
     // Show results
@@ -337,7 +626,10 @@ function displayResultsList(results) {
             ${results.map(result => `
                 <div class="result-item" data-id="${result.id}">
                     <div class="result-date">${new Date(result.timestamp).toLocaleDateString()}</div>
-                    <div class="result-label">${result.label || 'Untitled'}</div>
+                    <div class="result-label">
+                        ${result.label || 'Untitled'}
+                        ${result.isBatch ? ` (${result.imageCount} images)` : ''}
+                    </div>
                 </div>
             `).join('')}
         </div>

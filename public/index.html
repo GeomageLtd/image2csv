@@ -18,8 +18,11 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="imageFile">Select Image:</label>
-                    <input type="file" id="imageFile" accept="image/*" required>
+                    <label for="imageFiles">Select Images:</label>
+                    <input type="file" id="imageFiles" accept="image/*" multiple required>
+                    <div class="file-info" id="fileInfo" style="display: none;">
+                        <span id="fileCount">0 files selected</span>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -40,7 +43,15 @@
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            Processing your image... Please wait.
+            Processing your images... Please wait.
+        </div>
+
+        <div class="batch-progress" id="batchProgress" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+            </div>
+            <div class="progress-text" id="progressText">Processing images...</div>
+            <div class="image-preview" id="imagePreview"></div>
         </div>
 
         <div id="error" class="error" style="display: none;"></div>
@@ -48,12 +59,12 @@
         <div class="results" id="results">
             <div class="results-container">
                 <div class="result-section image-section">
-                    <h3>📷 Uploaded Image</h3>
-                    <img id="displayImage" class="uploaded-image" alt="Uploaded image">
+                    <h3 id="imagesSectionTitle">📷 Uploaded Images</h3>
+                    <div id="displayImages"></div>
                 </div>
                 
                 <div class="result-section csv-section">
-                    <h3>📊 Parsed CSV Data</h3>
+                    <h3>📊 Combined CSV Data</h3>
                     <button class="download-btn" id="downloadBtn">📥 Download CSV</button>
                     <div id="csvTableContainer"></div>
                 </div>

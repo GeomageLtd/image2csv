@@ -96,11 +96,36 @@ app.post('/api/save-result', async (req, res) => {
 
         const resultId = uuidv4();
         
-        // Save image data (base64)
-        const imageBuffer = Buffer.from(imageData.split(',')[1], 'base64');
-        const imageExtension = imageData.split(';')[0].split('/')[1];
-        const imagePath = `data/images/${resultId}.${imageExtension}`;
-        await fs.writeFile(imagePath, imageBuffer);
+        // FIX: Handle both array and single string cases
+        const imageArray = Array.isArray(imageData) ? imageData : [imageData];
+        
+        console.log(`Processing ${imageArray.length} image(s) for result ${resultId}`);
+        
+        // Save image data
+        const imagePaths = [];
+        const imageExtensions = [];
+        
+        for (let i = 0; i < imageArray.length; i++) {
+            const singleImageData = imageArray[i]; // This is now guaranteed to be a string
+            
+            // Validate the image data format
+            if (!singleImageData || typeof singleImageData !== 'string' || !singleImageData.includes('data:image/')) {
+                throw new Error(`Invalid image data format for image ${i + 1}`);
+            }
+            
+            // Extract base64 data and extension - NOW IT WORKS!
+            const imageBuffer = Buffer.from(singleImageData.split(',')[1], 'base64');
+            const imageExtension = singleImageData.split(';')[0].split('/')[1];
+            
+            // Create unique filename for each image
+            const imagePath = `data/images/${resultId}_${i}.${imageExtension}`;
+            await fs.writeFile(imagePath, imageBuffer);
+            
+            imagePaths.push(imagePath);
+            imageExtensions.push(imageExtension);
+            
+            console.log(`Image ${i + 1} saved to: ${imagePath}`);
+        }
         
         // Save CSV data
         const csvPath = `data/csv/${resultId}.csv`;
@@ -112,26 +137,35 @@ app.post('/api/save-result', async (req, res) => {
             timestamp: timestamp || new Date().toISOString(),
             prompt: prompt,
             label: label,
-            imagePath: imagePath,
             csvPath: csvPath,
-            imageExtension: imageExtension
+            isBatch: imageArray.length > 1,
+            imageCount: imageArray.length,
+            imagePaths: imagePaths,
+            imageExtensions: imageExtensions,
+            // Backward compatibility
+            imagePath: imagePaths[0],
+            imageExtension: imageExtensions[0]
         };
         
         // Save to file
         await saveResults();
+        
+        console.log(`Successfully saved result ${resultId} with ${imageArray.length} image(s)`);
         
         res.json({ 
             success: true, 
             resultId: resultId,
             shareUrl: `/result/${resultId}`
         });
+        
     } catch (error) {
-        console.error('Error saving result:', error);
-        res.status(500).json({ error: 'Failed to save result' });
+        console.error('Error saving result:', error.message);
+        console.error('Stack trace:', error.stack);
+        res.status(500).json({ error: 'Failed to save result: ' + error.message });
     }
 });
 
-// Get saved result
+// Get saved result (updated for batch support)
 app.get('/api/result/:id', async (req, res) => {
     try {
         const resultId = req.params.id;
@@ -141,9 +175,25 @@ app.get('/api/result/:id', async (req, res) => {
             return res.status(404).json({ error: 'Result not found' });
         }
         
-        // Read image file
-        const imageBuffer = await fs.readFile(result.imagePath);
-        const imageBase64 = `data:image/${result.imageExtension};base64,${imageBuffer.toString('base64')}`;
+        let imageData;
+        
+        if (result.isBatch && result.imagePaths) {
+            // Handle multiple images
+            imageData = [];
+            for (let i = 0; i < result.imagePaths.length; i++) {
+                const imagePath = result.imagePaths[i];
+                const imageExtension = result.imageExtensions[i];
+                const imageBuffer = await fs.readFile(imagePath);
+                const imageBase64 = `data:image/${imageExtension};base64,${imageBuffer.toString('base64')}`;
+                imageData.push(imageBase64);
+            }
+        } else {
+            // Handle single image (backward compatibility)
+            const imagePath = result.imagePath || result.imagePaths[0];
+            const imageExtension = result.imageExtension || result.imageExtensions[0];
+            const imageBuffer = await fs.readFile(imagePath);
+            imageData = `data:image/${imageExtension};base64,${imageBuffer.toString('base64')}`;
+        }
         
         // Read CSV file
         const csvData = await fs.readFile(result.csvPath, 'utf8');
@@ -153,8 +203,10 @@ app.get('/api/result/:id', async (req, res) => {
             timestamp: result.timestamp,
             prompt: result.prompt,
             label: result.label,
-            imageData: imageBase64,
-            csvData: csvData
+            imageData: imageData,
+            csvData: csvData,
+            isBatch: result.isBatch || false,
+            imageCount: result.imageCount || 1
         });
     } catch (error) {
         console.error('Error retrieving result:', error);
@@ -168,7 +220,9 @@ app.get('/api/results', (req, res) => {
         const results = Object.values(resultsStorage).map(result => ({
             id: result.id,
             timestamp: result.timestamp,
-            label: result.label || 'Untitled'
+            label: result.label || 'Untitled',
+            imageCount: result.imageCount || 1,
+            isBatch: result.isBatch || false
         })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         
         res.json(results);
@@ -183,7 +237,7 @@ app.get('/result/:id', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'result.html'));
 });
 
-// Delete a result
+// Delete a result (updated for batch support)
 app.delete('/api/result/:id', async (req, res) => {
     try {
         const resultId = req.params.id;
@@ -193,9 +247,20 @@ app.delete('/api/result/:id', async (req, res) => {
             return res.status(404).json({ error: 'Result not found' });
         }
         
-        // Delete files
+        // Delete image files
         try {
-            await fs.unlink(result.imagePath);
+            if (result.isBatch && result.imagePaths) {
+                // Delete multiple image files
+                for (const imagePath of result.imagePaths) {
+                    await fs.unlink(imagePath);
+                }
+            } else {
+                // Delete single image file (backward compatibility)
+                const imagePath = result.imagePath || result.imagePaths[0];
+                await fs.unlink(imagePath);
+            }
+            
+            // Delete CSV file
             await fs.unlink(result.csvPath);
         } catch (fileError) {
             console.error('Error deleting files:', fileError);
