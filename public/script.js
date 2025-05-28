@@ -776,3 +776,365 @@ function hideError() {
 function hideResults() {
     document.getElementById('results').style.display = 'none';
 }
+
+/**
+ * Create image previews for batch processing (updated with double-click)
+ * @param {FileList} imageFiles - Array of image files
+ */
+async function createImagePreviews(imageFiles) {
+    const previewContainer = document.getElementById('imagePreview');
+    previewContainer.innerHTML = '';
+    
+    for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        const imageUrl = URL.createObjectURL(file);
+        
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item';
+        previewItem.innerHTML = `
+            <div class="processing-status status-pending" id="status-${i}">Pending</div>
+            <img src="${imageUrl}" alt="${file.name}" class="preview-image" data-src="${imageUrl}">
+            <div class="preview-label">${file.name}</div>
+        `;
+        
+        // Add double-click event listener to open image in new tab
+        previewItem.addEventListener('dblclick', function() {
+            openImageInNewTab(imageUrl, file.name);
+        });
+        
+        previewContainer.appendChild(previewItem);
+    }
+}
+
+/**
+ * Display batch processing results (updated with double-click)
+ * @param {FileList} imageFiles - Original image files
+ * @param {string} combinedCsv - Combined CSV content
+ * @param {Array} results - Processing results
+ */
+function displayBatchResults(imageFiles, combinedCsv, results) {
+    // Update section title
+    const title = document.getElementById('imagesSectionTitle');
+    title.textContent = `📷 Uploaded Images (${imageFiles.length})`;
+    
+    // Display images
+    const displayContainer = document.getElementById('displayImages');
+    displayContainer.innerHTML = '';
+    displayContainer.className = 'image-preview';
+    
+    Array.from(imageFiles).forEach((file, index) => {
+        const imageUrl = URL.createObjectURL(file);
+        const result = results[index];
+        
+        const imageItem = document.createElement('div');
+        imageItem.className = 'preview-item';
+        imageItem.innerHTML = `
+            <img src="${imageUrl}" alt="${file.name}" class="preview-image" data-src="${imageUrl}">
+            <div class="preview-label">
+                ${file.name} 
+                ${result.success ? '✅' : '❌'}
+            </div>
+        `;
+        
+        // Add double-click event listener
+        imageItem.addEventListener('dblclick', function() {
+            openImageInNewTab(imageUrl, file.name);
+        });
+        
+        displayContainer.appendChild(imageItem);
+    });
+    
+    // Store and display CSV
+    csvData = combinedCsv;
+    displayCSVTable(csvData);
+    
+    // Show results
+    document.getElementById('results').style.display = 'block';
+}
+
+/**
+ * Display saved results (updated for batch support with double-click)
+ * @param {string|Array} imageData - Base64 image data or array
+ * @param {string} csvContent - CSV content
+ */
+function displaySavedResults(imageData, csvContent) {
+    // Handle both single image and batch display
+    if (Array.isArray(imageData)) {
+        // Batch display - vertical layout
+        const title = document.getElementById('imagesSectionTitle');
+        title.textContent = `📷 Saved Images (${imageData.length})`;
+        
+        const displayContainer = document.getElementById('displayImages');
+        displayContainer.innerHTML = '';
+        displayContainer.className = 'image-preview';
+        
+        imageData.forEach((imgData, index) => {
+            const imageItem = document.createElement('div');
+            imageItem.className = 'preview-item';
+            imageItem.innerHTML = `
+                <img src="${imgData}" alt="Saved image ${index + 1}" class="preview-image" data-src="${imgData}">
+                <div class="preview-label">Image ${index + 1}</div>
+            `;
+            
+            // Add double-click event listener
+            imageItem.addEventListener('dblclick', function() {
+                openImageInNewTab(imgData, `Saved_Image_${index + 1}`);
+            });
+            
+            displayContainer.appendChild(imageItem);
+        });
+    } else {
+        // Single image display
+        const title = document.getElementById('imagesSectionTitle');
+        title.textContent = '📷 Uploaded Image';
+        
+        const displayContainer = document.getElementById('displayImages');
+        displayContainer.innerHTML = `
+            <div class="preview-item" style="cursor: pointer;">
+                <img src="${imageData}" class="preview-image uploaded-image" alt="Saved image" data-src="${imageData}">
+                <div class="preview-label">Saved Image</div>
+            </div>
+        `;
+        displayContainer.className = 'image-preview';
+        
+        // Add double-click event listener for single image
+        const singleImageItem = displayContainer.querySelector('.preview-item');
+        singleImageItem.addEventListener('dblclick', function() {
+            openImageInNewTab(imageData, 'Saved_Image');
+        });
+    }
+    
+    // Clean and display CSV
+    csvData = csvContent.trim();
+    displayCSVTable(csvData);
+    
+    // Show results
+    document.getElementById('results').style.display = 'block';
+}
+
+/**
+ * Open image in new tab
+ * @param {string} imageUrl - Image URL or base64 data
+ * @param {string} imageName - Name for the image
+ */
+function openImageInNewTab(imageUrl, imageName) {
+    try {
+        // Create a new window/tab
+        const newWindow = window.open('', '_blank');
+        
+        if (!newWindow) {
+            // Fallback if popup blocked
+            alert('Please allow popups to open images in new tabs');
+            return;
+        }
+        
+        // Create HTML content for the new tab
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>${imageName} - Image Viewer</title>
+                <style>
+                    body {
+                        margin: 0;
+                        padding: 20px;
+                        background: #1a1a1a;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    }
+                    .header {
+                        color: white;
+                        margin-bottom: 20px;
+                        text-align: center;
+                    }
+                    .image-container {
+                        max-width: 95vw;
+                        max-height: 85vh;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: white;
+                        border-radius: 8px;
+                        padding: 10px;
+                        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                    }
+                    .main-image {
+                        max-width: 100%;
+                        max-height: 100%;
+                        object-fit: contain;
+                        border-radius: 4px;
+                    }
+                    .controls {
+                        margin-top: 20px;
+                        text-align: center;
+                    }
+                    .btn {
+                        background: #667eea;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        margin: 0 10px;
+                        font-size: 14px;
+                        transition: background 0.3s ease;
+                    }
+                    .btn:hover {
+                        background: #5a6fd8;
+                    }
+                    .image-info {
+                        color: #ccc;
+                        font-size: 14px;
+                        margin-top: 10px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2>${imageName}</h2>
+                </div>
+                <div class="image-container">
+                    <img src="${imageUrl}" alt="${imageName}" class="main-image" id="mainImage">
+                </div>
+                <div class="controls">
+                    <button class="btn" onclick="downloadImage()">📥 Download</button>
+                    <button class="btn" onclick="window.close()">✖️ Close</button>
+                </div>
+                <div class="image-info" id="imageInfo">
+                    Click and drag to pan • Use mouse wheel to zoom
+                </div>
+
+                <script>
+                    // Add zoom and pan functionality
+                    let scale = 1;
+                    let isDragging = false;
+                    let startX, startY, translateX = 0, translateY = 0;
+                    
+                    const img = document.getElementById('mainImage');
+                    const container = document.querySelector('.image-container');
+                    
+                    // Zoom functionality
+                    container.addEventListener('wheel', function(e) {
+                        e.preventDefault();
+                        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                        scale *= delta;
+                        scale = Math.min(Math.max(0.5, scale), 5);
+                        updateTransform();
+                    });
+                    
+                    // Pan functionality
+                    container.addEventListener('mousedown', function(e) {
+                        isDragging = true;
+                        startX = e.clientX - translateX;
+                        startY = e.clientY - translateY;
+                        container.style.cursor = 'grabbing';
+                    });
+                    
+                    document.addEventListener('mousemove', function(e) {
+                        if (!isDragging) return;
+                        translateX = e.clientX - startX;
+                        translateY = e.clientY - startY;
+                        updateTransform();
+                    });
+                    
+                    document.addEventListener('mouseup', function() {
+                        isDragging = false;
+                        container.style.cursor = 'grab';
+                    });
+                    
+                    function updateTransform() {
+                        img.style.transform = \`translate(\${translateX}px, \${translateY}px) scale(\${scale})\`;
+                    }
+                    
+                    // Download functionality
+                    function downloadImage() {
+                        const link = document.createElement('a');
+                        link.href = '${imageUrl}';
+                        link.download = '${imageName}';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+                    
+                    // Reset view on double-click
+                    container.addEventListener('dblclick', function() {
+                        scale = 1;
+                        translateX = 0;
+                        translateY = 0;
+                        updateTransform();
+                    });
+                    
+                    // Initialize
+                    container.style.cursor = 'grab';
+                </script>
+            </body>
+            </html>
+        `;
+        
+        // Write content to new window
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        
+    } catch (error) {
+        console.error('Error opening image in new tab:', error);
+        // Fallback: try to open image URL directly
+        window.open(imageUrl, '_blank');
+    }
+}
+
+// Update the existing displayImages function for result.html (if needed)
+/**
+ * Display images (updated for result.html with double-click support)
+ * @param {string|Array} imageData - Single image or array of images
+ * @param {boolean} isBatch - Whether this is a batch result
+ */
+function displayImages(imageData, isBatch) {
+    const title = document.getElementById('imagesSectionTitle');
+    const displayContainer = document.getElementById('displayImages');
+    
+    if (isBatch && Array.isArray(imageData)) {
+        // Batch display - vertical layout
+        title.textContent = `📷 Images (${imageData.length})`;
+        displayContainer.innerHTML = '';
+        displayContainer.className = 'image-preview';
+        
+        imageData.forEach((imgData, index) => {
+            const imageItem = document.createElement('div');
+            imageItem.className = 'preview-item';
+            imageItem.innerHTML = `
+                <img src="${imgData}" alt="Image ${index + 1}" class="preview-image">
+                <div class="preview-label">Image ${index + 1}</div>
+            `;
+            
+            // Add double-click event listener
+            imageItem.addEventListener('dblclick', function() {
+                openImageInNewTab(imgData, `Image_${index + 1}`);
+            });
+            
+            displayContainer.appendChild(imageItem);
+        });
+    } else {
+        // Single image display
+        title.textContent = '📷 Image';
+        const singleImage = Array.isArray(imageData) ? imageData[0] : imageData;
+        displayContainer.innerHTML = `
+            <div class="preview-item" style="cursor: pointer;">
+                <img src="${singleImage}" class="preview-image uploaded-image" alt="Shared image">
+                <div class="preview-label">Shared Image</div>
+            </div>
+        `;
+        displayContainer.className = 'image-preview';
+        
+        // Add double-click event listener for single image
+        const singleImageItem = displayContainer.querySelector('.preview-item');
+        singleImageItem.addEventListener('dblclick', function() {
+            openImageInNewTab(singleImage, 'Shared_Image');
+        });
+    }
+}
