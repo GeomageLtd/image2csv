@@ -73,5 +73,29 @@
     </div>
 
     <script src="script.js"></script>
+
+    <!-- Image Crop Modal -->
+    <div id="cropModal" class="crop-modal" style="display: none;">
+        <div class="crop-modal-content">
+            <div class="crop-modal-header">
+                <h3>🔧 Crop Image</h3>
+                <button class="crop-close-btn" onclick="closeCropModal()">&times;</button>
+            </div>
+            <div class="crop-canvas-container">
+                <canvas id="cropCanvas"></canvas>
+                <div class="crop-overlay">
+                    <div class="crop-selection" id="cropSelection"></div>
+                </div>
+            </div>
+            <div class="crop-controls">
+                <button class="crop-btn secondary" onclick="resetCrop()">🔄 Reset</button>
+                <button class="crop-btn secondary" onclick="closeCropModal()">❌ Cancel</button>
+                <button class="crop-btn primary" onclick="applyCrop()">✂️ Apply Crop</button>
+            </div>
+            <div class="crop-info">
+                <span id="cropDimensions">Click and drag to select crop area</span>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

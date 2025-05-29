@@ -51,11 +51,81 @@ document.getElementById('imageFiles').addEventListener('change', function(e) {
         }
         
         document.getElementById('resultLabel').value = defaultLabel;
+        
+        // Show image previews immediately with crop functionality
+        showImagePreviewsForSelection(files);
     } else {
         fileInfo.style.display = 'none';
         document.getElementById('resultLabel').value = '';
+        
+        // Hide previews
+        hideImagePreviews();
     }
 });
+
+/**
+ * Show image previews immediately after file selection
+ * @param {FileList} files - Selected files
+ */
+async function showImagePreviewsForSelection(files) {
+    // Clear any existing cropped files from previous selections
+    croppedFiles.clear();
+    
+    // Show the preview container
+    const batchProgress = document.getElementById('batchProgress');
+    batchProgress.style.display = 'block';
+    
+    // Hide progress bar since we're just showing previews
+    const progressBar = batchProgress.querySelector('.progress-bar');
+    const progressText = batchProgress.querySelector('.progress-text');
+    if (progressBar) progressBar.style.display = 'none';
+    if (progressText) progressText.style.display = 'none';
+    
+    // Create previews with crop functionality
+    await createImagePreviewsForSelection(files);
+}
+
+/**
+ * Hide image previews
+ */
+function hideImagePreviews() {
+    const batchProgress = document.getElementById('batchProgress');
+    batchProgress.style.display = 'none';
+    
+    // Clear cropped files
+    croppedFiles.clear();
+}
+
+/**
+ * Create image previews for file selection (before processing)
+ * @param {FileList} imageFiles - Array of image files
+ */
+async function createImagePreviewsForSelection(imageFiles) {
+    const previewContainer = document.getElementById('imagePreview');
+    previewContainer.innerHTML = '';
+    
+    for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        const imageUrl = URL.createObjectURL(file);
+        
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item';
+        previewItem.innerHTML = `
+            <button class="crop-button" onclick="openCropModal(${i})">
+                ✂️ Crop
+            </button>
+            <img src="${imageUrl}" alt="${file.name}" class="preview-image" data-src="${imageUrl}">
+            <div class="preview-label">${file.name}</div>
+        `;
+        
+        // Add double-click event listener to open image in new tab
+        previewItem.addEventListener('dblclick', function() {
+            openImageInNewTab(imageUrl, file.name);
+        });
+        
+        previewContainer.appendChild(previewItem);
+    }
+}
 
 // Main form submission handler
 document.getElementById('uploadForm').addEventListener('submit', async function(e) {
@@ -113,7 +183,7 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
 });
 
 /**
- * Process multiple images in batch
+ * Process multiple images in batch (UPDATED to show progress elements)
  * @param {string} apiKey - OpenAI API key
  * @param {FileList} imageFiles - Array of image files
  * @param {string} textPrompt - User prompt
@@ -126,7 +196,7 @@ async function processBatchImages(apiKey, imageFiles, textPrompt) {
     showBatchProgress();
     updateProgress(0, totalFiles, 'Starting batch processing...');
     
-    // Create preview for all images
+    // Create/update preview for all images (reuse existing if available)
     await createImagePreviews(imageFiles);
     
     for (let i = 0; i < totalFiles; i++) {
@@ -135,8 +205,8 @@ async function processBatchImages(apiKey, imageFiles, textPrompt) {
         updateProgress(i, totalFiles, `Processing ${file.name}...`);
         
         try {
-            // Convert image to base64
-            const base64Image = await fileToBase64(file);
+            // Convert image to base64 (uses cropped version if available)
+            const base64Image = await fileToBase64(file, i);
             
             // Make API call to OpenAI
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -207,11 +277,31 @@ async function processBatchImages(apiKey, imageFiles, textPrompt) {
 }
 
 /**
- * Create image previews for batch processing
+ * Create image previews for batch processing (updated to reuse existing previews)
  * @param {FileList} imageFiles - Array of image files
  */
 async function createImagePreviews(imageFiles) {
     const previewContainer = document.getElementById('imagePreview');
+    
+    // Check if previews already exist from file selection
+    const existingPreviews = previewContainer.querySelectorAll('.preview-item');
+    
+    if (existingPreviews.length === imageFiles.length) {
+        // Previews already exist, just add processing status indicators
+        existingPreviews.forEach((previewItem, i) => {
+            // Check if status indicator already exists
+            if (!previewItem.querySelector(`#status-${i}`)) {
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'processing-status status-pending';
+                statusDiv.id = `status-${i}`;
+                statusDiv.textContent = 'Pending';
+                previewItem.insertBefore(statusDiv, previewItem.firstChild);
+            }
+        });
+        return;
+    }
+    
+    // Create new previews if they don't exist
     previewContainer.innerHTML = '';
     
     for (let i = 0; i < imageFiles.length; i++) {
@@ -222,9 +312,17 @@ async function createImagePreviews(imageFiles) {
         previewItem.className = 'preview-item';
         previewItem.innerHTML = `
             <div class="processing-status status-pending" id="status-${i}">Pending</div>
-            <img src="${imageUrl}" alt="${file.name}" class="preview-image">
+            <button class="crop-button" onclick="openCropModal(${i})">
+                ✂️ Crop
+            </button>
+            <img src="${imageUrl}" alt="${file.name}" class="preview-image" data-src="${imageUrl}">
             <div class="preview-label">${file.name}</div>
         `;
+        
+        // Add double-click event listener to open image in new tab
+        previewItem.addEventListener('dblclick', function() {
+            openImageInNewTab(imageUrl, file.name);
+        });
         
         previewContainer.appendChild(previewItem);
     }
@@ -244,10 +342,17 @@ function updateImageStatus(index, status) {
 }
 
 /**
- * Show batch progress UI
+ * Show batch progress UI (updated to show progress elements)
  */
 function showBatchProgress() {
-    document.getElementById('batchProgress').style.display = 'block';
+    const batchProgress = document.getElementById('batchProgress');
+    batchProgress.style.display = 'block';
+    
+    // Show progress bar and text for processing
+    const progressBar = batchProgress.querySelector('.progress-bar');
+    const progressText = batchProgress.querySelector('.progress-text');
+    if (progressBar) progressBar.style.display = 'block';
+    if (progressText) progressText.style.display = 'block';
 }
 
 /**
@@ -849,6 +954,9 @@ async function createImagePreviews(imageFiles) {
         previewItem.className = 'preview-item';
         previewItem.innerHTML = `
             <div class="processing-status status-pending" id="status-${i}">Pending</div>
+            <button class="crop-button" onclick="openCropModal(${i})">
+                ✂️ Crop
+            </button>
             <img src="${imageUrl}" alt="${file.name}" class="preview-image" data-src="${imageUrl}">
             <div class="preview-label">${file.name}</div>
         `;
@@ -2151,4 +2259,403 @@ function addValidationButton() {
     } else {
         controlsDiv.appendChild(validateBtn);
     }
+}
+
+// Global variables for cropping
+let currentCropFile = null;
+let currentCropIndex = -1;
+let cropCanvas = null;
+let cropCtx = null;
+let cropSelection = {
+    startX: 0,
+    startY: 0,
+    endX: 0,
+    endY: 0,
+    isSelecting: false
+};
+let originalImage = null;
+let croppedFiles = new Map(); // Store cropped versions
+
+/**
+ * Open crop modal for specific image
+ * @param {number} imageIndex - Index of the image to crop
+ */
+function openCropModal(imageIndex) {
+    const imageFiles = document.getElementById('imageFiles').files;
+    if (!imageFiles || imageIndex >= imageFiles.length) return;
+    
+    currentCropFile = imageFiles[imageIndex];
+    currentCropIndex = imageIndex;
+    
+    // Show modal
+    const modal = document.getElementById('cropModal');
+    modal.style.display = 'flex';
+    modal.classList.add('show');
+    
+    // Initialize canvas
+    setTimeout(() => {
+        initializeCropCanvas();
+    }, 100);
+}
+
+/**
+ * Initialize crop canvas with image
+ */
+function initializeCropCanvas() {
+    if (!currentCropFile) return;
+    
+    cropCanvas = document.getElementById('cropCanvas');
+    cropCtx = cropCanvas.getContext('2d');
+    
+    // Load image
+    originalImage = new Image();
+    originalImage.onload = function() {
+        // Calculate canvas size to fit image while maintaining aspect ratio
+        const maxWidth = 800;
+        const maxHeight = 600;
+        
+        let canvasWidth = this.naturalWidth;
+        let canvasHeight = this.naturalHeight;
+        
+        // Scale down if too large
+        if (canvasWidth > maxWidth || canvasHeight > maxHeight) {
+            const scaleX = maxWidth / canvasWidth;
+            const scaleY = maxHeight / canvasHeight;
+            const scale = Math.min(scaleX, scaleY);
+            
+            canvasWidth = canvasWidth * scale;
+            canvasHeight = canvasHeight * scale;
+        }
+        
+        cropCanvas.width = canvasWidth;
+        cropCanvas.height = canvasHeight;
+        
+        // Draw image
+        cropCtx.drawImage(this, 0, 0, canvasWidth, canvasHeight);
+        
+        // Add event listeners for selection
+        addCropEventListeners();
+        
+        // Update info
+        updateCropInfo('Click and drag to select crop area');
+    };
+    
+    // Use cropped version if exists, otherwise original
+    const fileToShow = croppedFiles.get(currentCropIndex) || currentCropFile;
+    originalImage.src = URL.createObjectURL(fileToShow);
+}
+
+/**
+ * Add event listeners for crop selection
+ */
+function addCropEventListeners() {
+    const canvas = cropCanvas;
+    const selection = document.getElementById('cropSelection');
+    
+    let isMouseDown = false;
+    
+    // Mouse down - start selection
+    canvas.addEventListener('mousedown', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        cropSelection.startX = e.clientX - rect.left;
+        cropSelection.startY = e.clientY - rect.top;
+        cropSelection.isSelecting = true;
+        isMouseDown = true;
+        
+        selection.style.display = 'block';
+        selection.style.left = cropSelection.startX + 'px';
+        selection.style.top = cropSelection.startY + 'px';
+        selection.style.width = '0px';
+        selection.style.height = '0px';
+    });
+    
+    // Mouse move - update selection
+    canvas.addEventListener('mousemove', function(e) {
+        if (!isMouseDown || !cropSelection.isSelecting) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        cropSelection.endX = e.clientX - rect.left;
+        cropSelection.endY = e.clientY - rect.top;
+        
+        // Calculate selection box
+        const left = Math.min(cropSelection.startX, cropSelection.endX);
+        const top = Math.min(cropSelection.startY, cropSelection.endY);
+        const width = Math.abs(cropSelection.endX - cropSelection.startX);
+        const height = Math.abs(cropSelection.endY - cropSelection.startY);
+        
+        selection.style.left = left + 'px';
+        selection.style.top = top + 'px';
+        selection.style.width = width + 'px';
+        selection.style.height = height + 'px';
+        
+        // Update info
+        updateCropInfo(`Selection: ${Math.round(width)} × ${Math.round(height)} pixels`);
+    });
+    
+    // Mouse up - finish selection
+    canvas.addEventListener('mouseup', function(e) {
+        isMouseDown = false;
+        if (cropSelection.isSelecting) {
+            const rect = canvas.getBoundingClientRect();
+            cropSelection.endX = e.clientX - rect.left;
+            cropSelection.endY = e.clientY - rect.top;
+            
+            // Ensure minimum selection size
+            const width = Math.abs(cropSelection.endX - cropSelection.startX);
+            const height = Math.abs(cropSelection.endY - cropSelection.startY);
+            
+            if (width < 10 || height < 10) {
+                resetCropSelection();
+                updateCropInfo('Selection too small. Click and drag to select crop area.');
+            }
+        }
+    });
+    
+    // Touch events for mobile
+    canvas.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousedown', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    });
+    
+    canvas.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousemove', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    });
+    
+    canvas.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        const mouseEvent = new MouseEvent('mouseup', {});
+        canvas.dispatchEvent(mouseEvent);
+    });
+}
+
+/**
+ * Reset crop selection
+ */
+function resetCrop() {
+    resetCropSelection();
+    
+    // Redraw original image
+    if (originalImage && cropCanvas && cropCtx) {
+        cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+        cropCtx.drawImage(originalImage, 0, 0, cropCanvas.width, cropCanvas.height);
+    }
+    
+    updateCropInfo('Click and drag to select crop area');
+}
+
+/**
+ * Reset crop selection UI
+ */
+function resetCropSelection() {
+    const selection = document.getElementById('cropSelection');
+    selection.style.display = 'none';
+    
+    cropSelection = {
+        startX: 0,
+        startY: 0,
+        endX: 0,
+        endY: 0,
+        isSelecting: false
+    };
+}
+
+/**
+ * Apply crop to image
+ */
+async function applyCrop() {
+    if (!cropCanvas || !originalImage) return;
+    
+    const selection = document.getElementById('cropSelection');
+    if (selection.style.display === 'none') {
+        alert('Please select an area to crop first');
+        return;
+    }
+    
+    // Calculate crop coordinates
+    const left = Math.min(cropSelection.startX, cropSelection.endX);
+    const top = Math.min(cropSelection.startY, cropSelection.endY);
+    const width = Math.abs(cropSelection.endX - cropSelection.startX);
+    const height = Math.abs(cropSelection.endY - cropSelection.startY);
+    
+    if (width < 10 || height < 10) {
+        alert('Selection area is too small');
+        return;
+    }
+    
+    // Create new canvas for cropped image
+    const croppedCanvas = document.createElement('canvas');
+    const croppedCtx = croppedCanvas.getContext('2d');
+    
+    // Calculate scale factors
+    const scaleX = originalImage.naturalWidth / cropCanvas.width;
+    const scaleY = originalImage.naturalHeight / cropCanvas.height;
+    
+    // Set cropped canvas size
+    croppedCanvas.width = width * scaleX;
+    croppedCanvas.height = height * scaleY;
+    
+    // Draw cropped portion
+    croppedCtx.drawImage(
+        originalImage,
+        left * scaleX, top * scaleY, width * scaleX, height * scaleY,
+        0, 0, croppedCanvas.width, croppedCanvas.height
+    );
+    
+    // Convert to blob and create new file
+    croppedCanvas.toBlob(function(blob) {
+        // Create new file with cropped data
+        const croppedFile = new File([blob], currentCropFile.name, {
+            type: currentCropFile.type,
+            lastModified: Date.now()
+        });
+        
+        // Store cropped file
+        croppedFiles.set(currentCropIndex, croppedFile);
+        
+        // Update preview
+        updateImagePreview(currentCropIndex, URL.createObjectURL(croppedFile));
+        
+        // Close modal
+        closeCropModal();
+        
+        // Show success message
+        showCropSuccess();
+        
+    }, currentCropFile.type, 0.9);
+}
+
+/**
+ * Close crop modal
+ */
+function closeCropModal() {
+    const modal = document.getElementById('cropModal');
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+    
+    // Cleanup
+    resetCropSelection();
+    currentCropFile = null;
+    currentCropIndex = -1;
+    originalImage = null;
+    
+    // Clear canvas
+    if (cropCanvas && cropCtx) {
+        cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+    }
+}
+
+/**
+ * Update crop info display
+ * @param {string} message - Info message
+ */
+function updateCropInfo(message) {
+    const infoElement = document.getElementById('cropDimensions');
+    if (infoElement) {
+        infoElement.textContent = message;
+    }
+}
+
+/**
+ * Update image preview after cropping
+ * @param {number} index - Image index
+ * @param {string} newUrl - New image URL
+ */
+function updateImagePreview(index, newUrl) {
+    const previewImg = document.querySelector(`#imagePreview .preview-item:nth-child(${index + 1}) .preview-image`);
+    if (previewImg) {
+        previewImg.src = newUrl;
+        previewImg.dataset.src = newUrl;
+        
+        // Add cropped indicator
+        const previewItem = previewImg.closest('.preview-item');
+        const cropButton = previewItem.querySelector('.crop-button');
+        if (cropButton) {
+            cropButton.innerHTML = '✂️ Cropped';
+            cropButton.classList.add('cropped');
+            
+            // Add a subtle border to indicate the image has been cropped
+            previewItem.style.border = '2px solid #28a745';
+            previewItem.style.boxShadow = '0 4px 15px rgba(40, 167, 69, 0.2)';
+        }
+    }
+}
+
+/**
+ * Show crop success message
+ */
+function showCropSuccess() {
+    // Create temporary success message
+    const successMsg = document.createElement('div');
+    successMsg.className = 'crop-success-msg';
+    successMsg.innerHTML = '✅ Image cropped successfully!';
+    successMsg.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #d4edda;
+        color: #155724;
+        padding: 12px 20px;
+        border-radius: 8px;
+        border: 1px solid #c3e6cb;
+        z-index: 1001;
+        font-weight: 500;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        animation: slideInRight 0.3s ease;
+    `;
+    
+    document.body.appendChild(successMsg);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        successMsg.style.animation = 'slideOutRight 0.3s ease';
+        setTimeout(() => {
+            if (successMsg.parentNode) {
+                successMsg.parentNode.removeChild(successMsg);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Add CSS animations
+const cropAnimations = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+`;
+
+// Add animations to page
+if (!document.getElementById('cropAnimations')) {
+    const style = document.createElement('style');
+    style.id = 'cropAnimations';
+    style.textContent = cropAnimations;
+    document.head.appendChild(style);
 }
