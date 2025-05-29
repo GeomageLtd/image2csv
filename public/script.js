@@ -16,6 +16,10 @@ document.getElementById('downloadBtn').addEventListener('click', function() {
 let csvData = '';
 let currentResultId = null;
 
+// Global variables for TIFF processing
+let processedFiles = []; // Store processed files (including TIFF pages)
+let originalFileList = []; // Store original file list for reference
+
 // Check for result ID in URL on page load
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -26,37 +30,129 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     loadResultsList();
+    
+    // Check TIFF library status
+    checkTiffLibraryStatus();
 });
 
+/**
+ * Check if TIFF library is loaded and working
+ */
+function checkTiffLibraryStatus() {
+    try {
+        if (typeof UTIF !== 'undefined') {
+            console.log('✅ UTIF library loaded successfully');
+            
+            // Add a small indicator to the file input label
+            const label = document.querySelector('label[for="imageFiles"]');
+            if (label) {
+                const status = document.createElement('small');
+                status.style.color = '#28a745';
+                status.style.marginLeft = '8px';
+                status.innerHTML = '✅ TIFF support enabled';
+                label.appendChild(status);
+            }
+        } else {
+            console.warn('⚠️ UTIF library not loaded - TIFF support disabled');
+            
+            // Show warning to user
+            const label = document.querySelector('label[for="imageFiles"]');
+            if (label) {
+                const status = document.createElement('small');
+                status.style.color = '#dc3545';
+                status.style.marginLeft = '8px';
+                status.innerHTML = '⚠️ TIFF support unavailable';
+                label.appendChild(status);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking TIFF library status:', error);
+    }
+}
+
 // Auto-fill label when file is selected
-document.getElementById('imageFiles').addEventListener('change', function(e) {
+document.getElementById('imageFiles').addEventListener('change', async function(e) {
     const files = e.target.files;
     const fileInfo = document.getElementById('fileInfo');
     const fileCount = document.getElementById('fileCount');
     
     if (files.length > 0) {
+        // Store original file list
+        originalFileList = Array.from(files);
+        
+        // Show loading for TIFF processing
+        const loadingMsg = document.createElement('div');
+        loadingMsg.id = 'tiffProcessing';
+        loadingMsg.style.cssText = 'margin-top: 8px; color: #667eea; font-size: 0.9em;';
+        loadingMsg.innerHTML = '⏳ Processing files...';
+        fileInfo.appendChild(loadingMsg);
         fileInfo.style.display = 'block';
-        fileCount.textContent = `${files.length} file${files.length > 1 ? 's' : ''} selected`;
         
-        // Generate default label based on file count and first filename
-        const firstFile = files[0];
-        let defaultLabel;
-        
-        if (files.length === 1) {
-            const nameWithoutExt = firstFile.name.substring(0, firstFile.name.lastIndexOf('.')) || firstFile.name;
-            defaultLabel = nameWithoutExt;
-        } else {
-            const baseName = firstFile.name.substring(0, firstFile.name.lastIndexOf('.')) || firstFile.name;
-            defaultLabel = `${baseName} + ${files.length - 1} more`;
+        try {
+            // Process files and extract TIFF pages if needed
+            processedFiles = await processFilesWithTiff(files);
+            
+            // Remove loading message
+            const processingMsg = document.getElementById('tiffProcessing');
+            if (processingMsg) {
+                processingMsg.remove();
+            }
+            
+            // Update file count to show processed files
+            const originalCount = files.length;
+            const processedCount = processedFiles.length;
+            
+            let countText = `${processedCount} file${processedCount > 1 ? 's' : ''} ready for processing`;
+            if (processedCount > originalCount) {
+                countText += ` (${processedCount - originalCount} extracted from TIFF)`;
+            }
+            fileCount.textContent = countText;
+            
+            // Generate default label based on file count and first filename
+            const firstFile = processedFiles[0] || files[0];
+            let defaultLabel;
+            
+            if (processedFiles.length === 1) {
+                const nameWithoutExt = firstFile.name.substring(0, firstFile.name.lastIndexOf('.')) || firstFile.name;
+                defaultLabel = nameWithoutExt;
+            } else {
+                const baseName = firstFile.name.substring(0, firstFile.name.lastIndexOf('.')) || firstFile.name;
+                if (processedCount > originalCount) {
+                    // Include TIFF info in label
+                    defaultLabel = `${baseName} + ${processedCount - 1} more (inc. TIFF pages)`;
+                } else {
+                    defaultLabel = `${baseName} + ${processedCount - 1} more`;
+                }
+            }
+            
+            document.getElementById('resultLabel').value = defaultLabel;
+            
+            // Show image previews immediately with crop functionality
+            showImagePreviewsForSelection(processedFiles);
+            
+        } catch (error) {
+            console.error('Error processing files:', error);
+            showError('Error processing files: ' + error.message);
+            
+            // Remove loading message
+            const processingMsg = document.getElementById('tiffProcessing');
+            if (processingMsg) {
+                processingMsg.remove();
+            }
+            
+            // Fall back to original files
+            processedFiles = Array.from(files);
+            fileCount.textContent = `${files.length} file${files.length > 1 ? 's' : ''} selected`;
+            document.getElementById('resultLabel').value = files[0].name.substring(0, files[0].name.lastIndexOf('.')) || files[0].name;
+            showImagePreviewsForSelection(files);
         }
-        
-        document.getElementById('resultLabel').value = defaultLabel;
-        
-        // Show image previews immediately with crop functionality
-        showImagePreviewsForSelection(files);
     } else {
         fileInfo.style.display = 'none';
         document.getElementById('resultLabel').value = '';
+        
+        // Clear processed files
+        processedFiles = [];
+        originalFileList = [];
         
         // Hide previews
         hideImagePreviews();
@@ -98,7 +194,7 @@ function hideImagePreviews() {
 
 /**
  * Create image previews for file selection (before processing)
- * @param {FileList} imageFiles - Array of image files
+ * @param {FileList|Array} imageFiles - Array of image files
  */
 async function createImagePreviewsForSelection(imageFiles) {
     const previewContainer = document.getElementById('imagePreview');
@@ -108,19 +204,32 @@ async function createImagePreviewsForSelection(imageFiles) {
         const file = imageFiles[i];
         const imageUrl = URL.createObjectURL(file);
         
+        // Create label with TIFF page info if applicable
+        let displayLabel = file.name;
+        if (file.isTiffPage) {
+            displayLabel = `${file.originalTiffName} - Page ${file.pageNumber}/${file.totalPages}`;
+        }
+        
         const previewItem = document.createElement('div');
         previewItem.className = 'preview-item';
+        
+        // Add special styling for TIFF pages
+        if (file.isTiffPage) {
+            previewItem.classList.add('tiff-page-item');
+        }
+        
         previewItem.innerHTML = `
             <button class="crop-button" onclick="openCropModal(${i})">
                 ✂️ Crop
             </button>
-            <img src="${imageUrl}" alt="${file.name}" class="preview-image" data-src="${imageUrl}">
-            <div class="preview-label">${file.name}</div>
+            ${file.isTiffPage ? '<div class="tiff-page-badge">📄 TIFF Page</div>' : ''}
+            <img src="${imageUrl}" alt="${displayLabel}" class="preview-image" data-src="${imageUrl}">
+            <div class="preview-label">${displayLabel}</div>
         `;
         
         // Add double-click event listener to open image in new tab
         previewItem.addEventListener('dblclick', function() {
-            openImageInNewTab(imageUrl, file.name);
+            openImageInNewTab(imageUrl, displayLabel);
         });
         
         previewContainer.appendChild(previewItem);
@@ -136,7 +245,10 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     const textPrompt = document.getElementById('textPrompt').value;
     const resultLabel = document.getElementById('resultLabel').value.trim();
     
-    if (!apiKey || imageFiles.length === 0 || !textPrompt) {
+    // Use processed files if available, otherwise fall back to original files
+    const filesToProcess = processedFiles.length > 0 ? processedFiles : Array.from(imageFiles);
+    
+    if (!apiKey || filesToProcess.length === 0 || !textPrompt) {
         showError('Please fill in all fields and select at least one image');
         return;
     }
@@ -144,10 +256,10 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     // Generate final label
     let finalLabel = resultLabel;
     if (!finalLabel) {
-        if (imageFiles.length === 1) {
-            finalLabel = imageFiles[0].name.substring(0, imageFiles[0].name.lastIndexOf('.')) || imageFiles[0].name;
+        if (filesToProcess.length === 1) {
+            finalLabel = filesToProcess[0].name.substring(0, filesToProcess[0].name.lastIndexOf('.')) || filesToProcess[0].name;
         } else {
-            finalLabel = `Batch of ${imageFiles.length} images`;
+            finalLabel = `Batch of ${filesToProcess.length} images`;
         }
     }
     
@@ -157,7 +269,7 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         hideResults();
         
         // Sort files alphabetically by filename
-        const sortedFiles = Array.from(imageFiles).sort((a, b) => a.name.localeCompare(b.name));
+        const sortedFiles = filesToProcess.sort((a, b) => a.name.localeCompare(b.name));
         
         // Process multiple images
         const results = await processBatchImages(apiKey, sortedFiles, textPrompt);
@@ -861,10 +973,22 @@ function displayResultsList(results) {
 /**
  * Convert file to base64 data URL
  * @param {File} file - The file to convert
+ * @param {number} index - Optional index for cropped file lookup
  * @returns {Promise<string>} Base64 data URL
  */
-function fileToBase64(file) {
+function fileToBase64(file, index = null) {
     return new Promise((resolve, reject) => {
+        // Check for cropped version first if index provided
+        if (index !== null && croppedFiles.has(index)) {
+            const croppedFile = croppedFiles.get(index);
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(croppedFile);
+            return;
+        }
+        
+        // Use original file
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
         reader.onerror = reject;
@@ -2716,4 +2840,210 @@ if (!document.getElementById('cropAnimations')) {
     style.id = 'cropAnimations';
     style.textContent = cropAnimations;
     document.head.appendChild(style);
+}
+
+// TIFF Processing Functions
+
+/**
+ * Check if a file is a TIFF file
+ * @param {File} file - File to check
+ * @returns {boolean} True if file is TIFF
+ */
+function isTiffFile(file) {
+    const name = file.name.toLowerCase();
+    const type = file.type.toLowerCase();
+    return name.endsWith('.tif') || name.endsWith('.tiff') || 
+           type === 'image/tiff' || type === 'image/tif';
+}
+
+/**
+ * Extract pages from a multipage TIFF file using UTIF.js
+ * @param {File} tiffFile - TIFF file to process
+ * @returns {Promise<Array>} Array of File objects for each page
+ */
+async function extractTiffPages(tiffFile) {
+    return new Promise((resolve, reject) => {
+        // Check if UTIF is available
+        if (typeof UTIF === 'undefined') {
+            reject(new Error('UTIF library not loaded. Please refresh the page and try again.'));
+            return;
+        }
+        
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const buffer = e.target.result;
+                
+                // Decode TIFF file
+                let ifds;
+                try {
+                    ifds = UTIF.decode(buffer);
+                } catch (decodeError) {
+                    reject(new Error(`Failed to decode TIFF file "${tiffFile.name}": ${decodeError.message}`));
+                    return;
+                }
+                
+                const pageCount = ifds.length;
+                
+                console.log(`TIFF file "${tiffFile.name}" has ${pageCount} page(s)`);
+                
+                if (pageCount === 0) {
+                    reject(new Error(`No pages found in TIFF file "${tiffFile.name}"`));
+                    return;
+                }
+                
+                const baseName = tiffFile.name.replace(/\.(tiff?|TIF+)$/i, '');
+                const pages = [];
+                let processedCount = 0;
+                
+                // Process each page
+                for (let i = 0; i < pageCount; i++) {
+                    try {
+                        const ifd = ifds[i];
+                        UTIF.decodeImage(buffer, ifd);
+                        
+                        // Create canvas for this page
+                        const canvas = document.createElement('canvas');
+                        canvas.width = ifd.width;
+                        canvas.height = ifd.height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Convert RGBA data to ImageData
+                        const rgba = UTIF.toRGBA8(ifd);
+                        const imageData = new ImageData(new Uint8ClampedArray(rgba), ifd.width, ifd.height);
+                        
+                        // Draw to canvas
+                        ctx.putImageData(imageData, 0, 0);
+                        
+                        // Convert canvas to blob
+                        canvas.toBlob((blob) => {
+                            if (!blob) {
+                                console.error(`Failed to create blob for page ${i + 1}`);
+                                processedCount++;
+                                if (processedCount === pageCount) {
+                                    const sortedPages = pages.filter(p => p).sort((a, b) => a.pageIndex - b.pageIndex);
+                                    if (sortedPages.length === 0) {
+                                        reject(new Error(`No pages could be processed from TIFF file "${tiffFile.name}"`));
+                                    } else {
+                                        resolve(sortedPages);
+                                    }
+                                }
+                                return;
+                            }
+                            
+                            // Create file object for this page
+                            const fileName = pageCount === 1 ? 
+                                `${baseName}.png` : 
+                                `${baseName}_page_${i + 1}.png`;
+                                
+                            const pageFile = new File([blob], fileName, { type: 'image/png' });
+                            
+                            // Add metadata to identify as TIFF page
+                            pageFile.isTiffPage = true;
+                            pageFile.originalTiffName = tiffFile.name;
+                            pageFile.pageNumber = i + 1;
+                            pageFile.totalPages = pageCount;
+                            pageFile.pageIndex = i; // Add page index for sorting
+                            
+                            pages[i] = pageFile; // Store in correct position
+                            processedCount++;
+                            
+                            // Resolve when all pages are processed
+                            if (processedCount === pageCount) {
+                                // Filter out any undefined entries and sort by page index
+                                const sortedPages = pages.filter(p => p).sort((a, b) => a.pageIndex - b.pageIndex);
+                                if (sortedPages.length === 0) {
+                                    reject(new Error(`No pages could be processed from TIFF file "${tiffFile.name}"`));
+                                } else {
+                                    resolve(sortedPages);
+                                }
+                            }
+                        }, 'image/png', 0.9);
+                        
+                    } catch (pageError) {
+                        console.error(`Error processing page ${i + 1}:`, pageError);
+                        processedCount++;
+                        
+                        // Continue with other pages even if one fails
+                        if (processedCount === pageCount) {
+                            const sortedPages = pages.filter(p => p).sort((a, b) => a.pageIndex - b.pageIndex);
+                            if (sortedPages.length === 0) {
+                                reject(new Error(`No pages could be processed from TIFF file "${tiffFile.name}"`));
+                            } else {
+                                resolve(sortedPages);
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error processing TIFF file:', error);
+                reject(new Error(`Failed to process TIFF file "${tiffFile.name}": ${error.message}`));
+            }
+        };
+        
+        reader.onerror = () => {
+            reject(new Error(`Failed to read TIFF file "${tiffFile.name}"`));
+        };
+        
+        reader.readAsArrayBuffer(tiffFile);
+    });
+}
+
+/**
+ * Process files and extract TIFF pages if needed
+ * @param {FileList} files - Selected files
+ * @returns {Promise<Array>} Array of processed files
+ */
+async function processFilesWithTiff(files) {
+    const processedFiles = [];
+    let hasTiffFile = false;
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        if (isTiffFile(file)) {
+            hasTiffFile = true;
+            console.log(`Processing TIFF file: ${file.name}`);
+            
+            try {
+                const tiffPages = await extractTiffPages(file);
+                console.log(`Extracted ${tiffPages.length} pages from ${file.name}`);
+                processedFiles.push(...tiffPages);
+            } catch (error) {
+                console.error('Error processing TIFF:', error);
+                // Show error but continue with other files
+                showError(`Error processing TIFF "${file.name}": ${error.message}`);
+                
+                // Add original file as fallback
+                processedFiles.push(file);
+            }
+        } else {
+            // Regular image file
+            processedFiles.push(file);
+        }
+    }
+    
+    // Show TIFF info and update styling if any TIFF files were processed
+    const tiffInfo = document.getElementById('tiffInfo');
+    const fileInfo = document.getElementById('fileInfo');
+    
+    if (hasTiffFile) {
+        if (tiffInfo) {
+            tiffInfo.style.display = 'block';
+        }
+        if (fileInfo) {
+            fileInfo.classList.add('has-tiff');
+        }
+    } else {
+        if (tiffInfo) {
+            tiffInfo.style.display = 'none';
+        }
+        if (fileInfo) {
+            fileInfo.classList.remove('has-tiff');
+        }
+    }
+    
+    return processedFiles;
 }

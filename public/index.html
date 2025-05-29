@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image to CSV Parser</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
 </head>
 <body>
     <div class="container">
@@ -18,10 +19,14 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="imageFiles">Select Images:</label>
-                    <input type="file" id="imageFiles" accept="image/*" multiple required>
+                    <label for="imageFiles">Select Images or Multipage TIFF:</label>
+                    <input type="file" id="imageFiles" accept="image/*,.tif,.tiff" multiple required>
                     <div class="file-info" id="fileInfo" style="display: none;">
                         <span id="fileCount">0 files selected</span>
+                        <div id="tiffInfo" style="display: none; margin-top: 5px; color: #0056b3;">
+                            <small>📄 Multipage TIFF detected - individual pages will be extracted automatically</small>
+                            <br><small>💡 Each page will be processed as a separate image for better results</small>
+                        </div>
                     </div>
                 </div>
                 
