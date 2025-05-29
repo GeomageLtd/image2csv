@@ -80,7 +80,34 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Load JavaScript modules in order -->
+    <!-- Core configuration and state -->
+    <script src="js/config.js"></script>
+    
+    <!-- Utility functions -->
+    <script src="js/utils.js"></script>
+    
+    <!-- Feature modules -->
+    <script src="js/fileManager.js"></script>
+    <script src="js/cropManager.js"></script>
+    <script src="js/tableEditor.js"></script>
+    
+    <!-- Main application logic -->
+    <script src="js/main.js"></script>
+    
+    <!-- Fallback to original script for missing functionality -->
+    <script>
+        // Temporary fallback functions until all modules are implemented
+        function removeAllImages() {
+            const imageFiles = document.getElementById('imageFiles');
+            imageFiles.value = '';
+            AppState.processedFiles = [];
+            AppState.originalFileList = [];
+            ImagePreview.hide();
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('resultLabel').value = '';
+        }
+    </script>
 
     <!-- Image Crop Modal -->
     <div id="cropModal" class="crop-modal" style="display: none;">

@@ -286,7 +286,7 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         
         // Save combined result to server with sorted files
         const imageDataArray = await Promise.all(
-            sortedFiles.map(file => fileToBase64(file))
+            sortedFiles.map((file, index) => fileToBase64(file, index))
         );
         await saveResultToServer(imageDataArray, combinedCsv, textPrompt, finalLabel);
         
@@ -993,6 +993,7 @@ function fileToBase64(file, index = null) {
         }
         
         // Use original file
+        console.log('Using original file for index', index, 'file:', file.name);
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
         reader.onerror = reject;
@@ -2967,6 +2968,15 @@ async function applyCrop() {
         
         // Store cropped file
         croppedFiles.set(currentCropIndex, croppedFile);
+        
+        console.log('Cropped file stored:', {
+            index: currentCropIndex,
+            originalFileName: currentCropFile.name,
+            croppedFileName: croppedFile.name,
+            croppedFileSize: croppedFile.size,
+            totalCroppedFiles: croppedFiles.size,
+            allCroppedKeys: Array.from(croppedFiles.keys())
+        });
         
         // Update preview
         updateImagePreview(currentCropIndex, URL.createObjectURL(croppedFile));
