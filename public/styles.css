@@ -1562,3 +1562,209 @@ textarea:focus {
         opacity: 1;
     }
 }
+
+/* TIFF Page Styling */
+.tiff-page-item {
+    border: 2px solid #17a2b8 !important;
+    background: linear-gradient(135deg, #f8fdff 0%, #e3f7fd 100%) !important;
+}
+
+.tiff-page-item:hover {
+    border-color: #138496 !important;
+    box-shadow: 0 5px 15px rgba(23, 162, 184, 0.3) !important;
+}
+
+.tiff-page-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: linear-gradient(45deg, #17a2b8, #138496);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 0.7em;
+    font-weight: bold;
+    z-index: 15;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.tiff-page-item .preview-label {
+    background: linear-gradient(135deg, #e3f7fd 0%, #d1ecf1 100%) !important;
+    color: #0c5460 !important;
+    font-weight: 600;
+    border-top: 1px solid #bee5eb !important;
+}
+
+/* TIFF processing info styling */
+#tiffInfo {
+    animation: tiffInfoSlide 0.3s ease-in-out;
+}
+
+@keyframes tiffInfoSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Enhanced file info for TIFF */
+.file-info.has-tiff {
+    background: linear-gradient(135deg, #e3f7fd 0%, #d1ecf1 100%);
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+/* Mobile responsive adjustments for TIFF styling */
+@media (max-width: 768px) {
+    .tiff-page-badge {
+        padding: 3px 6px;
+        font-size: 0.65em;
+        right: 6px;
+        top: 6px;
+    }
+    
+    .tiff-page-item .preview-label {
+        font-size: 0.8em;
+        padding: 8px;
+    }
+}
+
+/* Remove button on preview items */
+.remove-button {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(220, 53, 69, 0.9);
+    color: white;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.7em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    opacity: 0.8;
+}
+
+.remove-button:hover {
+    background: rgba(220, 53, 69, 1);
+    transform: scale(1.1);
+    opacity: 1;
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.remove-button:active {
+    transform: scale(0.95);
+}
+
+/* Adjust crop button position to make room for remove button */
+.preview-item .crop-button {
+    top: 8px;
+    left: 8px;
+    right: auto;
+}
+
+/* Show remove and crop buttons more prominently on hover */
+.preview-item:hover .remove-button,
+.preview-item:hover .crop-button {
+    opacity: 1;
+}
+
+/* For TIFF pages, adjust the badge position slightly */
+.tiff-page-item .tiff-page-badge {
+    top: 36px;
+    right: 8px;
+}
+
+/* Mobile responsive adjustments for remove button */
+@media (max-width: 768px) {
+    .remove-button {
+        width: 28px;
+        height: 28px;
+        font-size: 0.8em;
+        top: 4px;
+        right: 4px;
+    }
+    
+    .preview-item .crop-button {
+        top: 4px;
+        left: 4px;
+    }
+    
+    .tiff-page-item .tiff-page-badge {
+        top: 40px;
+        right: 4px;
+        font-size: 0.65em;
+    }
+}
+
+/* Remove All button styling */
+.remove-all-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+    font-weight: 500;
+    margin-left: 10px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.remove-all-btn:hover {
+    background: #c82333;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.remove-all-btn:active {
+    transform: translateY(0);
+}
+
+/* File info layout adjustment */
+.file-info {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.file-info #fileCount {
+    flex: 1;
+}
+
+/* Mobile responsive adjustments for remove all button */
+@media (max-width: 768px) {
+    .remove-all-btn {
+        font-size: 0.7em;
+        padding: 3px 6px;
+        margin-left: 8px;
+    }
+    
+    .file-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .file-info #fileCount {
+        width: 100%;
+    }
+}

@@ -23,6 +23,9 @@
                     <input type="file" id="imageFiles" accept="image/*,.tif,.tiff" multiple required>
                     <div class="file-info" id="fileInfo" style="display: none;">
                         <span id="fileCount">0 files selected</span>
+                        <button class="remove-all-btn" id="removeAllBtn" onclick="removeAllImages()" title="Remove all images">
+                            🗑️ Remove All
+                        </button>
                         <div id="tiffInfo" style="display: none; margin-top: 5px; color: #0056b3;">
                             <small>📄 Multipage TIFF detected - individual pages will be extracted automatically</small>
                             <br><small>💡 Each page will be processed as a separate image for better results</small>

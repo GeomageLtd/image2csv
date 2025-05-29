@@ -212,6 +212,7 @@ async function createImagePreviewsForSelection(imageFiles) {
         
         const previewItem = document.createElement('div');
         previewItem.className = 'preview-item';
+        previewItem.id = `preview-item-${i}`;
         
         // Add special styling for TIFF pages
         if (file.isTiffPage) {
@@ -219,6 +220,9 @@ async function createImagePreviewsForSelection(imageFiles) {
         }
         
         previewItem.innerHTML = `
+            <button class="remove-button" onclick="removeImageFromPreview(${i})" title="Remove this image">
+                ❌
+            </button>
             <button class="crop-button" onclick="openCropModal(${i})">
                 ✂️ Crop
             </button>
@@ -3076,4 +3080,170 @@ async function processFilesWithTiff(files) {
     }
     
     return processedFiles;
+}
+
+/**
+ * Remove an image from the preview (before processing)
+ * @param {number} imageIndex - Index of the image to remove
+ */
+function removeImageFromPreview(imageIndex) {
+    if (!processedFiles || imageIndex >= processedFiles.length) {
+        console.error('Invalid image index for removal:', imageIndex);
+        return;
+    }
+    
+    const fileToRemove = processedFiles[imageIndex];
+    const fileName = fileToRemove.name;
+    
+    // Confirm removal
+    const confirmMessage = fileToRemove.isTiffPage ? 
+        `Remove TIFF page "${fileName}"?` : 
+        `Remove image "${fileName}"?`;
+        
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    console.log('Removing image:', fileName, 'Index:', imageIndex);
+    
+    // Remove from processed files array
+    processedFiles.splice(imageIndex, 1);
+    
+    // Remove any cropped version of this file
+    if (croppedFiles.has(imageIndex)) {
+        croppedFiles.delete(imageIndex);
+    }
+    
+    // Update cropped files indices (shift down indices after the removed one)
+    const newCroppedFiles = new Map();
+    croppedFiles.forEach((croppedFile, index) => {
+        if (index > imageIndex) {
+            newCroppedFiles.set(index - 1, croppedFile);
+        } else if (index < imageIndex) {
+            newCroppedFiles.set(index, croppedFile);
+        }
+    });
+    croppedFiles = newCroppedFiles;
+    
+    // Update UI
+    updateFileInfoAfterRemoval();
+    refreshImagePreviews();
+}
+
+/**
+ * Update file info display after image removal
+ */
+function updateFileInfoAfterRemoval() {
+    const fileCount = document.getElementById('fileCount');
+    const fileInfo = document.getElementById('fileInfo');
+    const resultLabel = document.getElementById('resultLabel');
+    
+    if (processedFiles.length === 0) {
+        // No files left, hide file info and clear everything
+        fileInfo.style.display = 'none';
+        resultLabel.value = '';
+        hideImagePreviews();
+        
+        // Reset file input
+        const fileInput = document.getElementById('imageFiles');
+        fileInput.value = '';
+        
+        return;
+    }
+    
+    // Update count display
+    const originalCount = originalFileList.length;
+    const processedCount = processedFiles.length;
+    
+    let countText = `${processedCount} file${processedCount > 1 ? 's' : ''} ready for processing`;
+    if (processedCount !== originalCount) {
+        const difference = originalCount - processedCount;
+        if (difference > 0) {
+            countText += ` (${difference} removed)`;
+        } else {
+            countText += ` (${processedCount - originalCount} extracted from TIFF)`;
+        }
+    }
+    fileCount.textContent = countText;
+    
+    // Update result label
+    updateResultLabel();
+}
+
+/**
+ * Update result label based on remaining files
+ */
+function updateResultLabel() {
+    const resultLabel = document.getElementById('resultLabel');
+    
+    if (processedFiles.length === 0) {
+        resultLabel.value = '';
+        return;
+    }
+    
+    const firstFile = processedFiles[0];
+    let defaultLabel;
+    
+    if (processedFiles.length === 1) {
+        const nameWithoutExt = firstFile.name.substring(0, firstFile.name.lastIndexOf('.')) || firstFile.name;
+        defaultLabel = nameWithoutExt;
+    } else {
+        const baseName = firstFile.name.substring(0, firstFile.name.lastIndexOf('.')) || firstFile.name;
+        const tiffPageCount = processedFiles.filter(f => f.isTiffPage).length;
+        
+        if (tiffPageCount > 0) {
+            defaultLabel = `${baseName} + ${processedFiles.length - 1} more (inc. TIFF pages)`;
+        } else {
+            defaultLabel = `${baseName} + ${processedFiles.length - 1} more`;
+        }
+    }
+    
+    resultLabel.value = defaultLabel;
+}
+
+/**
+ * Refresh image previews after removal (re-index everything)
+ */
+function refreshImagePreviews() {
+    if (processedFiles.length === 0) {
+        return;
+    }
+    
+    // Recreate the previews with updated indices
+    createImagePreviewsForSelection(processedFiles);
+}
+
+/**
+ * Remove all images from preview
+ */
+function removeAllImages() {
+    if (!processedFiles || processedFiles.length === 0) {
+        return;
+    }
+    
+    const fileCount = processedFiles.length;
+    const confirmMessage = `Remove all ${fileCount} image${fileCount > 1 ? 's' : ''}?`;
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    console.log('Removing all images');
+    
+    // Clear all arrays
+    processedFiles = [];
+    originalFileList = [];
+    croppedFiles.clear();
+    
+    // Reset file input
+    const fileInput = document.getElementById('imageFiles');
+    fileInput.value = '';
+    
+    // Update UI
+    const fileInfo = document.getElementById('fileInfo');
+    const resultLabel = document.getElementById('resultLabel');
+    
+    fileInfo.style.display = 'none';
+    resultLabel.value = '';
+    hideImagePreviews();
 }
