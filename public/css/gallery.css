@@ -190,9 +190,35 @@
     background: rgba(0, 255, 136, 1);
 }
 
+.preview-item .open-tab-button {
+    position: absolute;
+    top: 8px;
+    right: 35px;
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.preview-item .open-tab-button:hover {
+    background: rgba(102, 126, 234, 1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
 /* Show buttons on hover */
 .preview-item:hover .remove-button,
-.preview-item:hover .crop-button {
+.preview-item:hover .crop-button,
+.preview-item:hover .open-tab-button {
     opacity: 1;
 }
 
@@ -265,6 +291,7 @@
     overflow: hidden;
     background: white;
     border: 2px solid transparent;
+    position: relative;
 }
 
 .image-item:hover {
@@ -611,5 +638,36 @@
 
 /* Show drag handle on hover */
 .preview-item:hover .drag-handle {
+    opacity: 1;
+}
+
+.image-item .open-tab-button-result {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.8;
+}
+
+.image-item .open-tab-button-result:hover {
+    background: rgba(102, 126, 234, 1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+    opacity: 1;
+}
+
+.image-item:hover .open-tab-button-result {
     opacity: 1;
 } 

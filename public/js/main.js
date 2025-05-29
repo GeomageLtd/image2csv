@@ -265,6 +265,9 @@ const BatchProcessor = {
                 <button class="crop-button" onclick="openCropModal(${i})">
                     ✂️ Crop
                 </button>
+                <button class="open-tab-button" onclick="openInNewTab('${imageUrl}')" title="Open in new tab">
+                    🔗 Open
+                </button>
                 <img src="${imageUrl}" alt="${file.name}" class="preview-image" data-src="${imageUrl}">
                 <div class="preview-label">${file.name}</div>
             `;
@@ -857,6 +860,9 @@ const DisplayManager = {
                 '<span class="cropped-indicator" title="This image was cropped">✂️ Cropped</span>' : '';
             
             imageItem.innerHTML = `
+                <button class="open-tab-button-result" onclick="openInNewTab('${imageUrl}')" title="Open in new tab">
+                    🔗 Open
+                </button>
                 <img src="${imageUrl}" alt="${file.name}" onclick="openImageViewer(${index})">
                 <div class="image-label">
                     ${file.name} 
@@ -923,6 +929,9 @@ const DisplayManager = {
                 
                 return `
                     <div class="image-item">
+                        <button class="open-tab-button-result" onclick="openInNewTab('${imgData}')" title="Open in new tab">
+                            🔗 Open
+                        </button>
                         <img src="${imgData}" alt="Uploaded image ${index + 1}" 
                              onclick="openImageViewer(${index})" />
                         <div class="image-label">Image ${index + 1}</div>
@@ -942,6 +951,9 @@ const DisplayManager = {
             
             galleryContainer.innerHTML = `
                 <div class="image-item">
+                    <button class="open-tab-button-result" onclick="openInNewTab('${imageData}')" title="Open in new tab">
+                        🔗 Open
+                    </button>
                     <img src="${imageData}" alt="Uploaded image" 
                          onclick="openImageViewer(0)" />
                     <div class="image-label">Uploaded Image</div>
@@ -1041,6 +1053,9 @@ const ImagePreview = {
                 </button>
                 <button class="crop-button" onclick="openCropModal(${i})">
                     ✂️ Crop
+                </button>
+                <button class="open-tab-button" onclick="openInNewTab('${imageUrl}')" title="Open in new tab">
+                    🔗 Open
                 </button>
                 ${file.originalTiffName ? '<div class="tiff-page-badge">📄 TIFF Page</div>' : ''}
                 <img src="${imageUrl}" alt="${displayLabel}" class="preview-image" data-src="${imageUrl}">
