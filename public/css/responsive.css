@@ -88,6 +88,17 @@
         font-size: 0.8em;
     }
     
+    /* Image gallery centering on mobile */
+    #displayImages {
+        justify-content: center;
+        align-items: center;
+    }
+    
+    #displayImages.multiple-images {
+        justify-content: flex-start;
+        align-items: center;
+    }
+    
     /* Remove button mobile adjustments */
     .remove-button {
         width: 28px;
@@ -125,6 +136,8 @@
     
     .expanded-content {
         padding: 15px;
+        align-items: flex-start;
+        justify-content: center;
     }
     
     .expanded-navigation {
