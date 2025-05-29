@@ -112,7 +112,7 @@ function initializeCropCanvas() {
         addEnhancedCropEventListeners();
         
         // Update info
-        updateCropInfo('Use mouse wheel to zoom, drag to pan, click and drag to select crop area');
+        updateCropInfo('Use mouse wheel to zoom, middle mouse button to drag/pan, left click and drag to select crop area');
         
         console.log('Enhanced crop canvas initialized successfully');
     };
@@ -206,6 +206,7 @@ function addEnhancedCropEventListeners() {
     const selection = document.getElementById('cropSelection');
     
     let isMouseDown = false;
+    let isMiddleMouseDown = false;
     let isSelecting = false;
     let startX = 0, startY = 0;
     let lastPanX = panX, lastPanY = panY;
@@ -215,6 +216,12 @@ function addEnhancedCropEventListeners() {
     container.removeEventListener('mousedown', handleMouseDown);
     container.removeEventListener('mousemove', handleMouseMove);
     container.removeEventListener('mouseup', handleMouseUp);
+    container.removeEventListener('contextmenu', handleContextMenu);
+    
+    // Prevent context menu on middle mouse button
+    function handleContextMenu(e) {
+        e.preventDefault();
+    }
     
     // Mouse wheel for zoom
     function handleWheel(e) {
@@ -247,7 +254,18 @@ function addEnhancedCropEventListeners() {
             bottom: canvasRect.bottom - containerBounds.top
         };
         
-        if (mouseX >= relativeCanvasRect.left && mouseX <= relativeCanvasRect.right &&
+        // Middle mouse button (button 1) for panning
+        if (e.button === 1) {
+            isMiddleMouseDown = true;
+            startX = mouseX;
+            startY = mouseY;
+            lastPanX = panX;
+            lastPanY = panY;
+            container.style.cursor = 'grabbing';
+            updateCropInfo('Middle mouse button: Dragging image. Release to stop.');
+        }
+        // Left mouse button (button 0) for crop selection
+        else if (e.button === 0 && mouseX >= relativeCanvasRect.left && mouseX <= relativeCanvasRect.right &&
             mouseY >= relativeCanvasRect.top && mouseY <= relativeCanvasRect.bottom) {
             
             // Clicking on image - start selection
@@ -268,14 +286,7 @@ function addEnhancedCropEventListeners() {
             selection.style.width = '0px';
             selection.style.height = '0px';
             
-        } else {
-            // Clicking outside image - start pan
-            isMouseDown = true;
-            startX = mouseX;
-            startY = mouseY;
-            lastPanX = panX;
-            lastPanY = panY;
-            container.style.cursor = 'grabbing';
+            updateCropInfo('Left mouse button: Selecting crop area. Drag to adjust selection.');
         }
     }
     
@@ -305,8 +316,8 @@ function addEnhancedCropEventListeners() {
             
             updateCropInfo(`Selection: ${Math.round(width)} x ${Math.round(height)} pixels`);
             
-        } else if (isMouseDown) {
-            // Pan image
+        } else if (isMiddleMouseDown) {
+            // Pan image with middle mouse button
             const deltaX = mouseX - startX;
             const deltaY = mouseY - startY;
             
@@ -314,18 +325,20 @@ function addEnhancedCropEventListeners() {
             panY = lastPanY + deltaY;
             
             updateCanvasPosition();
+            updateCropInfo(`Panning image... Pan offset: ${Math.round(panX)}, ${Math.round(panY)}`);
         }
     }
     
     // Mouse up
     function handleMouseUp(e) {
-        if (isSelecting) {
+        if (isSelecting && e.button === 0) {
             isSelecting = false;
             container.style.cursor = 'default';
-            updateCropInfo('Selection complete. Adjust if needed, then click "Apply Crop"');
-        } else if (isMouseDown) {
-            isMouseDown = false;
+            updateCropInfo('Selection complete. Use middle mouse button to pan, mouse wheel to zoom, or click "Apply Crop"');
+        } else if (isMiddleMouseDown && e.button === 1) {
+            isMiddleMouseDown = false;
             container.style.cursor = 'default';
+            updateCropInfo('Image positioning complete. Left click and drag to select crop area.');
         }
     }
     
@@ -334,6 +347,7 @@ function addEnhancedCropEventListeners() {
     container.addEventListener('mousedown', handleMouseDown);
     container.addEventListener('mousemove', handleMouseMove);
     container.addEventListener('mouseup', handleMouseUp);
+    container.addEventListener('contextmenu', handleContextMenu);
 }
 
 /**
@@ -357,7 +371,7 @@ function resetZoom() {
     panY = 0;
     updateZoomDisplay();
     redrawCanvas();
-    updateCropInfo('Zoom and pan reset. Click and drag on image to select crop area.');
+    updateCropInfo('Zoom and pan reset. Use middle mouse button to drag, left click to select crop area.');
 }
 
 /**
@@ -377,7 +391,7 @@ function resetCrop() {
     resetCropSelection();
     resetZoom();
     
-    updateCropInfo('Zoom and pan reset. Click and drag on image to select crop area');
+    updateCropInfo('Zoom and pan reset. Use middle mouse button to drag, left click to select crop area');
 }
 
 /**
