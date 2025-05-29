@@ -508,8 +508,6 @@
 
 /* Image section layout adjustments */
 .result-section.image-section {
-    min-height: 500px;
-    max-height: 700px;
     display: flex;
     flex-direction: column;
 }
@@ -522,4 +520,8 @@
 #displayImages {
     flex: 1;
     min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    height: 100%;
 } 

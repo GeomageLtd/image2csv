@@ -89,6 +89,8 @@ h1 {
     gap: 25px;
     margin-top: 30px;
     max-width: none;
+    align-items: stretch;
+    min-height: 600px;
 }
 
 .result-section {
@@ -97,13 +99,16 @@ h1 {
     padding: 25px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
     border: 1px solid #e9ecef;
-    height: fit-content;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .result-section h3 {
     color: #495057;
     margin-bottom: 15px;
     font-size: 1.4em;
+    flex-shrink: 0;
 }
 
 .image-section {

@@ -43,6 +43,12 @@
     .results-container {
         grid-template-columns: 1fr;
         gap: 15px;
+        min-height: auto;
+    }
+    
+    .result-section {
+        height: auto;
+        min-height: 400px;
     }
     
     /* Form adjustments */

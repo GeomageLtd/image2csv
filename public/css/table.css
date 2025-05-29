@@ -21,6 +21,8 @@
     overflow-y: auto;
     border-radius: 8px;
     border: 1px solid #dee2e6;
+    flex: 1;
+    height: 100%;
 }
 
 .csv-table thead {
@@ -695,4 +697,20 @@
 
 .validation-stat.success .validation-stat-value {
     color: #28a745;
+}
+
+/* CSV section layout adjustments */
+.result-section.csv-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.result-section.csv-section h3 {
+    flex-shrink: 0;
+    margin-bottom: 15px;
+}
+
+.result-section.csv-section .csv-table-container {
+    flex: 1;
+    min-height: 400px;
 } 
