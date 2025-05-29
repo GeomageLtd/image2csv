@@ -109,8 +109,10 @@
     }
     
     .preview-item .crop-button {
-        top: 4px;
+        top: 40px;
         left: 4px;
+        padding: 4px 6px;
+        font-size: 0.6em;
     }
     
     /* TIFF badge mobile adjustments */
@@ -283,6 +285,43 @@
         gap: 8px;
         margin-left: 0;
         margin-top: 10px;
+    }
+    
+    /* Drag and drop mobile adjustments */
+    .drag-handle {
+        top: 4px;
+        left: 4px;
+        padding: 3px 6px;
+        font-size: 0.65em;
+        opacity: 1; /* Always visible on mobile */
+    }
+    
+    .order-number {
+        min-width: 14px;
+        padding: 1px 3px;
+        font-size: 0.9em;
+    }
+    
+    .drag-icon {
+        font-size: 0.5em;
+    }
+    
+    /* Mobile drag states - more visible */
+    .preview-item.dragging {
+        opacity: 0.7;
+        transform: rotate(3deg) scale(0.9);
+        border: 3px dashed #007bff;
+    }
+    
+    .preview-item.drag-over {
+        transform: scale(1.05);
+        border: 3px solid #007bff;
+    }
+    
+    /* Larger drop indicator for touch */
+    .drop-indicator {
+        width: 5px;
+        box-shadow: 0 0 15px rgba(0, 123, 255, 0.7);
     }
 }
 

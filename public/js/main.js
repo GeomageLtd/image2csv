@@ -739,6 +739,8 @@ const ImagePreview = {
             const previewItem = document.createElement('div');
             previewItem.className = 'preview-item';
             previewItem.id = `preview-item-${i}`;
+            previewItem.draggable = true;
+            previewItem.dataset.fileIndex = i;
             
             // Add special styling for TIFF pages
             if (file.originalTiffName) {
@@ -746,6 +748,10 @@ const ImagePreview = {
             }
             
             previewItem.innerHTML = `
+                <div class="drag-handle" title="Drag to reorder">
+                    <span class="order-number">${i + 1}</span>
+                    <span class="drag-icon">⋮⋮</span>
+                </div>
                 <button class="remove-button" onclick="removeImageFromPreview(${i})" title="Remove this image">
                     ❌
                 </button>
@@ -757,6 +763,9 @@ const ImagePreview = {
                 <div class="preview-label">${displayLabel}</div>
             `;
             
+            // Add drag and drop event listeners
+            this.addDragAndDropListeners(previewItem, i);
+            
             // Add double-click event listener to open image in new tab
             previewItem.addEventListener('dblclick', function() {
                 openInNewTab(imageUrl);
@@ -764,6 +773,157 @@ const ImagePreview = {
             
             previewContainer.appendChild(previewItem);
         }
+    },
+
+    /**
+     * Add drag and drop event listeners to preview item
+     * @param {HTMLElement} previewItem - Preview item element
+     * @param {number} index - File index
+     */
+    addDragAndDropListeners(previewItem, index) {
+        previewItem.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('text/plain', index);
+            e.dataTransfer.effectAllowed = 'move';
+            this.classList.add('dragging');
+            
+            // Create drag image with order number
+            const dragImage = this.cloneNode(true);
+            dragImage.style.transform = 'rotate(5deg)';
+            dragImage.style.opacity = '0.8';
+            document.body.appendChild(dragImage);
+            e.dataTransfer.setDragImage(dragImage, 50, 50);
+            setTimeout(() => document.body.removeChild(dragImage), 0);
+        });
+        
+        previewItem.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            // Remove all drop indicators
+            document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        });
+        
+        previewItem.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            
+            // Add visual indicator
+            this.classList.add('drag-over');
+            
+            // Show drop indicator
+            const rect = this.getBoundingClientRect();
+            const mouseX = e.clientX;
+            const centerX = rect.left + rect.width / 2;
+            
+            // Remove existing drop indicators
+            document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'drop-indicator';
+            indicator.style.cssText = `
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                width: 3px;
+                background: #007bff;
+                z-index: 1000;
+                pointer-events: none;
+            `;
+            
+            if (mouseX < centerX) {
+                // Drop before this item
+                indicator.style.left = '0px';
+                this.style.position = 'relative';
+                this.appendChild(indicator);
+            } else {
+                // Drop after this item
+                indicator.style.right = '0px';
+                this.style.position = 'relative';
+                this.appendChild(indicator);
+            }
+        });
+        
+        previewItem.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+        
+        previewItem.addEventListener('drop', function(e) {
+            e.preventDefault();
+            const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
+            const targetIndex = parseInt(this.dataset.fileIndex);
+            
+            if (sourceIndex !== targetIndex) {
+                const rect = this.getBoundingClientRect();
+                const mouseX = e.clientX;
+                const centerX = rect.left + rect.width / 2;
+                
+                let newIndex;
+                if (mouseX < centerX) {
+                    // Drop before this item
+                    newIndex = targetIndex;
+                } else {
+                    // Drop after this item
+                    newIndex = targetIndex + 1;
+                }
+                
+                // Adjust for source position
+                if (sourceIndex < newIndex) {
+                    newIndex--;
+                }
+                
+                ImagePreview.reorderFiles(sourceIndex, newIndex);
+            }
+            
+            // Cleanup
+            this.classList.remove('drag-over');
+            document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+        });
+    },
+
+    /**
+     * Reorder files in the array and update UI
+     * @param {number} fromIndex - Source index
+     * @param {number} toIndex - Target index
+     */
+    reorderFiles(fromIndex, toIndex) {
+        if (fromIndex === toIndex) return;
+        
+        console.log(`📋 Reordering: moving file from position ${fromIndex + 1} to position ${toIndex + 1}`);
+        
+        // Update the files array
+        const fileToMove = AppState.processedFiles.splice(fromIndex, 1)[0];
+        AppState.processedFiles.splice(toIndex, 0, fileToMove);
+        
+        // Update cropped files map
+        const newCroppedFiles = new Map();
+        AppState.croppedFiles.forEach((croppedFile, index) => {
+            let newIndex = index;
+            
+            if (index === fromIndex) {
+                // This is the moved file
+                newIndex = toIndex;
+            } else if (fromIndex < toIndex) {
+                // Moving forward: shift indices between fromIndex and toIndex back
+                if (index > fromIndex && index <= toIndex) {
+                    newIndex = index - 1;
+                }
+            } else {
+                // Moving backward: shift indices between toIndex and fromIndex forward
+                if (index >= toIndex && index < fromIndex) {
+                    newIndex = index + 1;
+                }
+            }
+            
+            newCroppedFiles.set(newIndex, croppedFile);
+        });
+        AppState.croppedFiles = newCroppedFiles;
+        
+        // Refresh the preview with new order
+        this.createImagePreviewsForSelection(AppState.processedFiles);
+        
+        // Update result label
+        updateResultLabel();
+        
+        console.log(`✅ Files reordered successfully. New order affects CSV processing.`);
     }
 };
 
