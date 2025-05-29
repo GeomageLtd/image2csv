@@ -544,16 +544,26 @@ const DisplayManager = {
         const title = document.getElementById('imagesSectionTitle');
         title.textContent = `📷 Uploaded Images (${imageFiles.length})`;
         
-        // Display images
-        const displayContainer = document.getElementById('displayImages');
-        displayContainer.innerHTML = '';
-        displayContainer.className = imageFiles.length > 1 ? 'multiple-images' : '';
+        // Display images in gallery
+        const galleryContainer = document.getElementById('imageGallery');
+        galleryContainer.innerHTML = '';
+        galleryContainer.className = imageFiles.length > 1 ? 'multiple-images' : '';
+        
+        // Store images for viewer
+        this.currentImages = [];
         
         Array.from(imageFiles).forEach((file, index) => {
             // Use cropped version if available, otherwise use original
             const fileToDisplay = AppState.croppedFiles.has(index) ? AppState.croppedFiles.get(index) : file;
             const imageUrl = URL.createObjectURL(fileToDisplay);
             const result = results[index];
+            
+            // Store image data for viewer
+            this.currentImages.push({
+                url: imageUrl,
+                name: file.name,
+                isCropped: AppState.croppedFiles.has(index)
+            });
             
             const imageItem = document.createElement('div');
             imageItem.className = 'image-item';
@@ -563,7 +573,7 @@ const DisplayManager = {
                 '<span class="cropped-indicator" title="This image was cropped">✂️ Cropped</span>' : '';
             
             imageItem.innerHTML = `
-                <img src="${imageUrl}" alt="${file.name}" ondblclick="openInNewTab('${imageUrl}')">
+                <img src="${imageUrl}" alt="${file.name}" onclick="openImageViewer(${index})">
                 <div class="image-label">
                     ${file.name} 
                     ${result && result.success ? '✅' : '❌'}
@@ -571,8 +581,11 @@ const DisplayManager = {
                 </div>
             `;
             
-            displayContainer.appendChild(imageItem);
+            galleryContainer.appendChild(imageItem);
         });
+        
+        // Ensure gallery is visible and expanded view is hidden
+        this.showGalleryView();
         
         // Store and display CSV with editing capabilities
         AppState.csvData = combinedCsv;
@@ -604,38 +617,82 @@ const DisplayManager = {
     },
     
     displayImages(imageData, isBatch) {
-        const displayContainer = document.getElementById('displayImages');
+        const galleryContainer = document.getElementById('imageGallery');
         const title = document.getElementById('imagesSectionTitle');
+        
+        // Store images for viewer
+        this.currentImages = [];
         
         if (isBatch && Array.isArray(imageData)) {
             title.textContent = `📷 Uploaded Images (${imageData.length})`;
             
-            // Add class for multiple images grid layout
-            displayContainer.className = imageData.length > 1 ? 'multiple-images' : '';
+            // Add class for multiple images horizontal layout
+            galleryContainer.className = imageData.length > 1 ? 'multiple-images' : '';
             
-            displayContainer.innerHTML = imageData.map((imgData, index) => `
-                <div class="image-item">
-                    <img src="${imgData}" alt="Uploaded image ${index + 1}" 
-                         ondblclick="openInNewTab('${imgData}')" />
-                    <div class="image-label">Image ${index + 1}</div>
-                </div>
-            `).join('');
+            galleryContainer.innerHTML = imageData.map((imgData, index) => {
+                // Store image data for viewer
+                this.currentImages.push({
+                    url: imgData,
+                    name: `Image ${index + 1}`,
+                    isCropped: false
+                });
+                
+                return `
+                    <div class="image-item">
+                        <img src="${imgData}" alt="Uploaded image ${index + 1}" 
+                             onclick="openImageViewer(${index})" />
+                        <div class="image-label">Image ${index + 1}</div>
+                    </div>
+                `;
+            }).join('');
         } else {
             title.textContent = '📷 Uploaded Image';
-            displayContainer.className = ''; // Single image, no special class
-            displayContainer.innerHTML = `
+            galleryContainer.className = ''; // Single image, no special class
+            
+            // Store single image for viewer
+            this.currentImages.push({
+                url: imageData,
+                name: 'Uploaded Image',
+                isCropped: false
+            });
+            
+            galleryContainer.innerHTML = `
                 <div class="image-item">
                     <img src="${imageData}" alt="Uploaded image" 
-                         ondblclick="openInNewTab('${imageData}')" />
+                         onclick="openImageViewer(0)" />
+                    <div class="image-label">Uploaded Image</div>
                 </div>
             `;
         }
+        
+        // Ensure gallery is visible
+        this.showGalleryView();
+    },
+    
+    showGalleryView() {
+        const galleryView = document.getElementById('imageGalleryView');
+        const expandedView = document.getElementById('imageExpandedView');
+        
+        galleryView.classList.remove('hidden');
+        expandedView.classList.remove('show');
+    },
+    
+    showExpandedView() {
+        const galleryView = document.getElementById('imageGalleryView');
+        const expandedView = document.getElementById('imageExpandedView');
+        
+        galleryView.classList.add('hidden');
+        expandedView.classList.add('show');
     },
     
     displayCSVTable(csvContent) {
         // Legacy function - now redirects to enhanced table editor
         displayCSVTableWithValidation(csvContent);
-    }
+    },
+
+    // Current images for the viewer
+    currentImages: [],
+    currentImageIndex: 0
 };
 
 const ImagePreview = {
@@ -854,4 +911,120 @@ function refreshImagePreviews() {
 
 // Make functions globally available for onclick handlers
 window.removeImageFromPreview = removeImageFromPreview;
-window.updateResultLabel = updateResultLabel; 
+window.updateResultLabel = updateResultLabel;
+
+/**
+ * Image Viewer Functions
+ */
+
+/**
+ * Open the image viewer in expanded view
+ * @param {number} imageIndex - Index of the image to display
+ */
+function openImageViewer(imageIndex) {
+    if (!DisplayManager.currentImages || DisplayManager.currentImages.length === 0) {
+        console.error('No images available for viewing');
+        return;
+    }
+
+    DisplayManager.currentImageIndex = imageIndex;
+    const expandedView = document.getElementById('imageExpandedView');
+    const image = document.getElementById('expandedImage');
+    const title = document.getElementById('expandedImageTitle');
+    const info = document.getElementById('expandedImageInfo');
+    const counter = document.getElementById('expandedCounter');
+    const navigation = document.getElementById('expandedNavigation');
+    const prevBtn = document.getElementById('expandedPrevBtn');
+    const nextBtn = document.getElementById('expandedNextBtn');
+    
+    // Set current image
+    const currentImage = DisplayManager.currentImages[imageIndex];
+    image.src = currentImage.url;
+    image.alt = currentImage.name;
+    
+    // Update title and info
+    const croppedText = currentImage.isCropped ? ' (Cropped)' : '';
+    title.textContent = currentImage.name;
+    info.textContent = `${imageIndex + 1} / ${DisplayManager.currentImages.length}${croppedText}`;
+    
+    // Update counter and navigation
+    const totalImages = DisplayManager.currentImages.length;
+    counter.textContent = `${imageIndex + 1} / ${totalImages}`;
+    
+    // Show/hide navigation based on number of images
+    if (totalImages > 1) {
+        navigation.style.display = 'flex';
+        prevBtn.disabled = imageIndex === 0;
+        nextBtn.disabled = imageIndex === totalImages - 1;
+    } else {
+        navigation.style.display = 'none';
+    }
+    
+    // Show expanded view
+    DisplayManager.showExpandedView();
+    
+    // Add keyboard event listener
+    document.addEventListener('keydown', handleImageViewerKeydown);
+}
+
+/**
+ * Close the image viewer and return to gallery
+ */
+function closeImageViewer() {
+    // Show gallery view
+    DisplayManager.showGalleryView();
+    
+    // Remove keyboard event listener
+    document.removeEventListener('keydown', handleImageViewerKeydown);
+}
+
+/**
+ * Navigate to previous image
+ */
+function previousImage() {
+    if (DisplayManager.currentImageIndex > 0) {
+        openImageViewer(DisplayManager.currentImageIndex - 1);
+    }
+}
+
+/**
+ * Navigate to next image
+ */
+function nextImage() {
+    if (DisplayManager.currentImageIndex < DisplayManager.currentImages.length - 1) {
+        openImageViewer(DisplayManager.currentImageIndex + 1);
+    }
+}
+
+/**
+ * Handle keyboard events in image viewer
+ * @param {KeyboardEvent} e - Keyboard event
+ */
+function handleImageViewerKeydown(e) {
+    // Only handle keyboard events when expanded view is visible
+    const expandedView = document.getElementById('imageExpandedView');
+    if (!expandedView.classList.contains('show')) {
+        return;
+    }
+    
+    switch(e.key) {
+        case 'Escape':
+            e.preventDefault();
+            closeImageViewer();
+            break;
+        case 'ArrowLeft':
+            e.preventDefault();
+            previousImage();
+            break;
+        case 'ArrowRight':
+            e.preventDefault();
+            nextImage();
+            break;
+    }
+}
+
+// Make image viewer functions globally available
+window.openImageViewer = openImageViewer;
+window.closeImageViewer = closeImageViewer;
+window.previousImage = previousImage;
+window.nextImage = nextImage; 

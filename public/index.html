@@ -68,7 +68,35 @@
             <div class="results-container">
                 <div class="result-section image-section">
                     <h3 id="imagesSectionTitle">📷 Uploaded Images</h3>
-                    <div id="displayImages"></div>
+                    <div id="displayImages">
+                        <!-- Gallery View -->
+                        <div id="imageGalleryView" class="image-gallery-view">
+                            <div id="imageGallery"></div>
+                        </div>
+                        
+                        <!-- Expanded Image View -->
+                        <div id="imageExpandedView" class="image-expanded-view">
+                            <div class="expanded-header">
+                                <h4 id="expandedImageTitle">Image Title</h4>
+                                <button class="expanded-back-btn" onclick="closeImageViewer()">
+                                    ← Back to Gallery
+                                </button>
+                            </div>
+                            
+                            <div class="expanded-content">
+                                <img id="expandedImage" class="expanded-image" src="" alt="Expanded image">
+                                <div class="expanded-info" id="expandedImageInfo">
+                                    1 / 1
+                                </div>
+                            </div>
+                            
+                            <div class="expanded-navigation" id="expandedNavigation">
+                                <button class="expanded-nav-btn" id="expandedPrevBtn" onclick="previousImage()" title="Previous Image">‹</button>
+                                <div class="expanded-counter" id="expandedCounter">1 / 1</div>
+                                <button class="expanded-nav-btn" id="expandedNextBtn" onclick="nextImage()" title="Next Image">›</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="result-section csv-section">
