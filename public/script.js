@@ -1201,14 +1201,14 @@ let hasUnsavedChanges = false;
 let currentEditingCell = null;
 
 /**
- * Create and display CSV table with editing capabilities
+ * Create and display CSV table with editing capabilities (UPDATED for numbered headers)
  * @param {string} csvContent - Raw CSV content
  */
 function displayCSVTable(csvContent) {
     const lines = csvContent.split('\n').filter(line => line.trim());
     if (lines.length === 0) return;
     
-    // Parse CSV into 2D array
+    // Parse CSV into 2D array - ALL rows are data now (no header row)
     csvDataArray = lines.map(line => 
         line.split(',').map(cell => cell.trim().replace(/"/g, ''))
     );
@@ -1231,24 +1231,26 @@ function displayCSVTable(csvContent) {
     table.className = 'csv-table';
     table.id = 'editableTable';
     
-    // Create header
+    // Create header with numbered columns (1, 2, 3, etc.)
     const thead = document.createElement('thead');
     const headerTr = document.createElement('tr');
     
-    csvDataArray[0].forEach((header, colIndex) => {
+    // Generate numbered headers based on the number of columns in first row
+    const columnCount = csvDataArray.length > 0 ? csvDataArray[0].length : 0;
+    for (let colIndex = 0; colIndex < columnCount; colIndex++) {
         const th = document.createElement('th');
-        th.textContent = header;
+        th.textContent = (colIndex + 1).toString(); // Headers: "1", "2", "3", etc.
         th.dataset.col = colIndex;
         headerTr.appendChild(th);
-    });
+    }
     
     thead.appendChild(headerTr);
     table.appendChild(thead);
     
-    // Create body with editable cells
+    // Create body with editable cells - ALL CSV rows are data rows now
     const tbody = document.createElement('tbody');
     
-    for (let rowIndex = 1; rowIndex < csvDataArray.length; rowIndex++) {
+    for (let rowIndex = 0; rowIndex < csvDataArray.length; rowIndex++) { // Start from 0 instead of 1
         const row = csvDataArray[rowIndex];
         const tr = document.createElement('tr');
         tr.dataset.row = rowIndex;
@@ -1510,7 +1512,7 @@ function selectCell(cell) {
 }
 
 /**
- * Update control button states
+ * Update control button states (UPDATED for no header considerations)
  * @param {number} selectedRow - Selected row index
  * @param {number} selectedCol - Selected column index
  */
@@ -1519,8 +1521,8 @@ function updateControlButtons(selectedRow, selectedCol) {
     const deleteColBtn = document.getElementById('deleteColBtn');
     const saveBtn = document.getElementById('saveChangesBtn');
     
-    deleteRowBtn.disabled = csvDataArray.length <= 2; // Keep at least header + 1 row
-    deleteColBtn.disabled = csvDataArray[0].length <= 1; // Keep at least 1 column
+    deleteRowBtn.disabled = csvDataArray.length <= 1; // Keep at least 1 data row
+    deleteColBtn.disabled = csvDataArray.length > 0 ? csvDataArray[0].length <= 1 : true; // Keep at least 1 column
     saveBtn.disabled = !hasUnsavedChanges;
 }
 
@@ -1540,19 +1542,14 @@ function addNewRow() {
 }
 
 /**
- * Add new column to table
+ * Add new column to table (UPDATED for numbered headers)
  */
 function addNewColumn() {
-    const columnName = prompt('Enter column name:', `Column ${csvDataArray[0].length + 1}`);
-    if (!columnName) return;
+    const newColumnNumber = csvDataArray.length > 0 ? csvDataArray[0].length + 1 : 1;
     
     // Add to each row
     csvDataArray.forEach((row, index) => {
-        if (index === 0) {
-            row.push(columnName); // Header
-        } else {
-            row.push(''); // Empty data
-        }
+        row.push(''); // Add empty cell to each row
     });
     
     hasUnsavedChanges = true;
@@ -1563,7 +1560,7 @@ function addNewColumn() {
 }
 
 /**
- * Delete selected row
+ * Delete selected row (UPDATED for no header considerations)
  */
 function deleteSelectedRow() {
     const selectedRow = document.querySelector('.highlight-row');
@@ -1573,7 +1570,7 @@ function deleteSelectedRow() {
     }
     
     const rowIndex = parseInt(selectedRow.dataset.row);
-    if (csvDataArray.length <= 2) {
+    if (csvDataArray.length <= 1) {
         alert('Cannot delete row. Table must have at least one data row.');
         return;
     }
@@ -1843,7 +1840,7 @@ function validateTableData() {
 }
 
 /**
- * Validate a specific column for data consistency
+ * Validate a specific column for data consistency (UPDATED - no header skipping)
  * @param {number} colIndex - Column index to validate
  * @returns {Array} Array of issue objects
  */
@@ -1851,8 +1848,8 @@ function validateColumn(colIndex) {
     const issues = [];
     const columnData = [];
     
-    // Extract numerical data from the column (skip header)
-    for (let rowIndex = 1; rowIndex < csvDataArray.length; rowIndex++) {
+    // Extract numerical data from the column - START FROM 0 (no header to skip)
+    for (let rowIndex = 0; rowIndex < csvDataArray.length; rowIndex++) {
         const cellValue = csvDataArray[rowIndex][colIndex];
         const numValue = parseFloat(cellValue);
         
@@ -1890,15 +1887,12 @@ function validateColumn(colIndex) {
     const sortedDeltas = deltas.map(d => d.delta).sort((a, b) => a - b);
     const medianDelta = calculateMedian(sortedDeltas);
     
-
     finalTolerance = 0;
     // Find outlier deltas
     deltas.forEach(deltaInfo => {
         const deviation = deltaInfo.delta - medianDelta;
         
         if (deviation > finalTolerance) {
-            // Determine which cell is more likely to be the issue
-            // For simplicity, we'll flag the "to" cell (the second value in the pair)
             issues.push({
                 type: 'inconsistent_delta',
                 row: deltaInfo.toRow,
@@ -2006,7 +2000,7 @@ function createTooltipText(issue) {
 }
 
 /**
- * Show validation summary
+ * Show validation summary (UPDATED for numbered headers)
  * @param {Array} issues - Array of issues found
  */
 function showValidationSummary(issues) {
@@ -2038,7 +2032,7 @@ function showValidationSummary(issues) {
                 <h4>⚠️ Data Validation Issues Found (${issues.length})</h4>
                 ${Object.entries(issuesByColumn).map(([colIndex, colIssues]) => `
                     <div class="column-issues">
-                        <strong>Column ${parseInt(colIndex) + 1} (${csvDataArray[0][colIndex]}):</strong>
+                        <strong>Column ${parseInt(colIndex) + 1}:</strong>
                         <ul>
                             ${colIssues.map(issue => `
                                 <li>
