@@ -421,19 +421,43 @@ const CSVProcessor = {
 
 const ResultManager = {
     async saveResult(imageData, csvContent, prompt, label) {
-        // Implementation for saving results to server
+        // Prepare complete session state for restoration
+        const sessionState = {
+            // Form data
+            prompt: prompt,
+            label: label,
+            
+            // Original file information (reconstructed from current state)
+            originalFiles: await this.prepareOriginalFilesData(),
+            
+            // Current file order (indices in the processedFiles array)
+            fileOrder: AppState.processedFiles.map((file, index) => ({
+                index: index,
+                filename: file.name,
+                originalTiffName: file.originalTiffName || null,
+                pageNumber: file.pageNumber || null,
+                totalPages: file.totalPages || null
+            })),
+            
+            // Cropped files data
+            croppedFiles: await this.prepareCroppedFilesData(),
+            
+            // Processing results
+            imageData: imageData,
+            csvData: csvContent,
+            
+            // Metadata
+            timestamp: new Date().toISOString(),
+            fileCount: AppState.processedFiles.length,
+            isBatch: AppState.processedFiles.length > 1
+        };
+        
         const response = await fetch('/api/save-result', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                imageData,
-                csvData: csvContent,
-                prompt,
-                label,
-                timestamp: new Date().toISOString()
-            })
+            body: JSON.stringify(sessionState)
         });
         
         if (!response.ok) {
@@ -443,18 +467,278 @@ const ResultManager = {
         return await response.json();
     },
     
+    /**
+     * Prepare original files data for saving
+     */
+    async prepareOriginalFilesData() {
+        const originalFilesData = [];
+        
+        for (let i = 0; i < AppState.processedFiles.length; i++) {
+            const file = AppState.processedFiles[i];
+            const fileData = await fileToBase64WithMeta(file);
+            
+            originalFilesData.push({
+                index: i,
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                data: fileData,
+                originalTiffName: file.originalTiffName || null,
+                pageNumber: file.pageNumber || null,
+                totalPages: file.totalPages || null
+            });
+        }
+        
+        return originalFilesData;
+    },
+    
+    /**
+     * Prepare cropped files data for saving
+     */
+    async prepareCroppedFilesData() {
+        const croppedFilesData = {};
+        
+        for (const [index, croppedFile] of AppState.croppedFiles.entries()) {
+            const croppedData = await fileToBase64WithMeta(croppedFile);
+            croppedFilesData[index] = {
+                name: croppedFile.name,
+                type: croppedFile.type,
+                size: croppedFile.size,
+                data: croppedData
+            };
+        }
+        
+        return croppedFilesData;
+    },
+    
     async loadSavedResult(resultId) {
         try {
             const response = await fetch(`/api/result/${resultId}`);
             if (response.ok) {
                 const result = await response.json();
-                DisplayManager.showSavedResult(result);
+                await this.restoreSessionState(result);
             } else {
                 showError('Failed to load saved result');
             }
         } catch (error) {
             console.error('Error loading saved result:', error);
             showError('Error loading saved result: ' + error.message);
+        }
+    },
+    
+    /**
+     * Restore complete session state from saved result
+     */
+    async restoreSessionState(result) {
+        try {
+            console.log('🔄 Restoring session state from saved result...');
+            
+            // Store current result ID
+            AppState.currentResultId = result.id;
+            AppState.csvData = result.csvData;
+            
+            // Restore form fields
+            if (result.prompt) {
+                const promptField = document.getElementById('textPrompt');
+                if (promptField) {
+                    promptField.value = result.prompt;
+                    // Trigger auto-resize
+                    promptField.style.height = 'auto';
+                    promptField.style.height = promptField.scrollHeight + 'px';
+                }
+            }
+            
+            if (result.label) {
+                const labelField = document.getElementById('resultLabel');
+                if (labelField) labelField.value = result.label;
+            }
+            
+            // Restore original files if available
+            if (result.originalFiles && result.originalFiles.length > 0) {
+                await this.restoreOriginalFiles(result);
+                await this.restoreCroppedFiles(result);
+                await this.restoreFileOrder(result);
+                
+                // Show file info
+                this.updateFileInfoFromRestored(result);
+                
+                // Show image previews with drag/drop reordering
+                ImagePreview.showForSelection(AppState.processedFiles);
+                
+                console.log('✅ Session state restored with original files and edit capabilities');
+            } else {
+                // Fallback to display-only mode for older saved results
+                DisplayManager.displayImages(result.imageData, result.isBatch);
+            }
+            
+            // Display CSV with editing capabilities
+            displayCSVTableWithValidation(result.csvData);
+            
+            // Show results section
+            document.getElementById('results').style.display = 'block';
+            
+            // Add restore notification
+            this.showRestoreNotification(result);
+            
+        } catch (error) {
+            console.error('Error restoring session state:', error);
+            showError('Error restoring session: ' + error.message);
+            
+            // Fallback to basic display
+            DisplayManager.showSavedResult(result);
+        }
+    },
+    
+    /**
+     * Restore original files from saved data
+     */
+    async restoreOriginalFiles(result) {
+        const restoredFiles = [];
+        
+        for (const fileData of result.originalFiles) {
+            try {
+                const file = await this.base64ToFile(fileData.data, fileData.name, fileData.type);
+                
+                // Restore TIFF metadata if present
+                if (fileData.originalTiffName) {
+                    file.originalTiffName = fileData.originalTiffName;
+                    file.pageNumber = fileData.pageNumber;
+                    file.totalPages = fileData.totalPages;
+                }
+                
+                restoredFiles.push(file);
+            } catch (error) {
+                console.error('Error restoring file:', fileData.name, error);
+            }
+        }
+        
+        AppState.processedFiles = restoredFiles;
+        AppState.originalFileList = [...restoredFiles];
+    },
+    
+    /**
+     * Restore cropped files from saved data
+     */
+    async restoreCroppedFiles(result) {
+        AppState.croppedFiles.clear();
+        
+        if (result.croppedFiles) {
+            for (const [indexStr, croppedData] of Object.entries(result.croppedFiles)) {
+                try {
+                    const index = parseInt(indexStr);
+                    const croppedFile = await this.base64ToFile(
+                        croppedData.data, 
+                        croppedData.name, 
+                        croppedData.type
+                    );
+                    
+                    AppState.croppedFiles.set(index, croppedFile);
+                } catch (error) {
+                    console.error('Error restoring cropped file:', error);
+                }
+            }
+        }
+    },
+    
+    /**
+     * Restore file order from saved data
+     */
+    async restoreFileOrder(result) {
+        if (result.fileOrder && result.fileOrder.length > 0) {
+            // The files are already in the correct order from restoreOriginalFiles
+            // Just verify the order matches
+            console.log('📋 File order restored:', result.fileOrder.map(f => f.filename));
+        }
+    },
+    
+    /**
+     * Convert base64 data back to File object
+     */
+    async base64ToFile(base64Data, filename, mimeType) {
+        // Remove data URL prefix if present
+        const base64 = base64Data.replace(/^data:.*,/, '');
+        
+        // Convert base64 to blob
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+        
+        // Create File object from blob
+        return new File([blob], filename, { type: mimeType });
+    },
+    
+    /**
+     * Update file info display from restored result
+     */
+    updateFileInfoFromRestored(result) {
+        const fileInfo = document.getElementById('fileInfo');
+        const fileCount = document.getElementById('fileCount');
+        
+        if (fileInfo && fileCount) {
+            fileInfo.style.display = 'block';
+            
+            const count = result.fileCount || AppState.processedFiles.length;
+            fileCount.textContent = `${count} file${count > 1 ? 's' : ''} restored from history`;
+            
+            // Show remove all button
+            const removeBtn = fileInfo.querySelector('.remove-all-btn');
+            if (removeBtn) {
+                removeBtn.style.display = 'inline-flex';
+            }
+        }
+    },
+    
+    /**
+     * Show notification that session was restored
+     */
+    showRestoreNotification(result) {
+        // Create temporary notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 2000;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+            font-weight: 500;
+            animation: slideInRight 0.3s ease;
+        `;
+        notification.innerHTML = `
+            ✅ Session restored: "${result.label}"<br>
+            <small>You can now modify and rerun processing</small>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 4 seconds
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 4000);
+        
+        // Add CSS animations if not already present
+        if (!document.getElementById('notificationStyles')) {
+            const style = document.createElement('style');
+            style.id = 'notificationStyles';
+            style.textContent = `
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOutRight {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
         }
     },
     

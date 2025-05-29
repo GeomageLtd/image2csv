@@ -25,6 +25,25 @@ function fileToBase64(file, index = null) {
 }
 
 /**
+ * Convert file to base64 string with metadata
+ * @param {File} file - File to convert
+ * @returns {Promise<string>} Base64 encoded string with data URL prefix
+ */
+function fileToBase64WithMeta(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            resolve(e.target.result);
+        };
+        reader.onerror = function(error) {
+            console.error(`Error reading file for metadata:`, error);
+            reject(error);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
  * Show error message to user
  * @param {string} message - Error message
  */
