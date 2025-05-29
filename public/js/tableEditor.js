@@ -26,29 +26,40 @@ function displayCSVTableWithValidation(csvContent) {
         return line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''));
     });
     
-    // Calculate optimal column widths
-    const columnWidths = calculateOptimalColumnWidths(rows, rows[0]?.length || 0);
+    // Treat ALL rows as data rows - ignore original headers
+    const dataRows = rows; // Use all rows as data
+    const columnCount = dataRows[0]?.length || 0;
+    
+    // Generate numeric headers (1, 2, 3, etc.)
+    const numericHeaders = [];
+    for (let i = 1; i <= columnCount; i++) {
+        numericHeaders.push(i.toString());
+    }
+    
+    // Calculate optimal column widths based on numeric headers and data
+    const allRowsForWidth = [numericHeaders, ...dataRows];
+    const columnWidths = calculateOptimalColumnWidths(allRowsForWidth, columnCount);
     
     // Create table with editing capabilities
     let tableHTML = '<div class="table-container"><table class="csv-table editable-table" id="csvTable"><thead>';
     
-    // Header row
-    if (rows.length > 0) {
+    // Create numeric header row
+    if (columnCount > 0) {
         tableHTML += '<tr class="header-row">';
-        rows[0].forEach((cell, colIndex) => {
+        numericHeaders.forEach((header, colIndex) => {
             const width = columnWidths[colIndex] || 'auto';
-            tableHTML += `<th style="width: ${width}px">${cell}</th>`;
+            tableHTML += `<th style="width: ${width}px">${header}</th>`;
         });
         tableHTML += '</tr></thead><tbody>';
         
-        // Data rows
-        for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+        // All original rows become data rows (starting from row 0)
+        dataRows.forEach((row, rowIndex) => {
             tableHTML += `<tr data-row="${rowIndex}">`;
-            rows[rowIndex].forEach((cell, colIndex) => {
+            row.forEach((cell, colIndex) => {
                 tableHTML += `<td data-row="${rowIndex}" data-col="${colIndex}" tabindex="0">${cell}</td>`;
             });
             tableHTML += '</tr>';
-        }
+        });
     }
     
     tableHTML += '</tbody></table></div>';
@@ -66,9 +77,10 @@ function displayCSVTableWithValidation(csvContent) {
     // Add validation button
     addValidationButton();
     
-    // Store original data for comparison
-    AppState.originalTableData = rows;
-    AppState.currentTableData = JSON.parse(JSON.stringify(rows));
+    // Store data with numeric headers for comparison
+    const allRowsWithHeaders = [numericHeaders, ...dataRows];
+    AppState.originalTableData = allRowsWithHeaders;
+    AppState.currentTableData = JSON.parse(JSON.stringify(allRowsWithHeaders));
 }
 
 /**
@@ -324,7 +336,7 @@ function updateControlButtons(row, col) {
     const saveChangesBtn = document.getElementById('saveChangesBtn');
     
     // Enable/disable delete buttons
-    if (deleteRowBtn) deleteRowBtn.disabled = row < 1; // Can't delete header
+    if (deleteRowBtn) deleteRowBtn.disabled = row < 0;
     if (deleteColBtn) deleteColBtn.disabled = col < 0;
     
     // Enable save button if there are changes
@@ -340,7 +352,7 @@ function addNewRow() {
     const headerCells = table.querySelectorAll('thead th');
     const columnCount = headerCells.length;
     
-    const newRowIndex = tbody.children.length + 1;
+    const newRowIndex = tbody.children.length; // 0-based index for new row
     const newRow = document.createElement('tr');
     newRow.dataset.row = newRowIndex;
     
@@ -358,7 +370,7 @@ function addNewRow() {
     // Add event listeners to new cells
     addCellEditListeners(table);
     
-    // Update data structure
+    // Update data structure - append to the end of the data
     if (AppState.currentTableData) {
         AppState.currentTableData.push(new Array(columnCount).fill(''));
     }
@@ -374,16 +386,17 @@ function addNewColumn() {
     const header = table.querySelector('thead tr');
     const rows = table.querySelectorAll('tbody tr');
     
-    // Add header cell
+    // Add header cell with numeric header
     const newHeaderCell = document.createElement('th');
-    newHeaderCell.textContent = `Column ${header.children.length + 1}`;
+    const newColumnNumber = header.children.length + 1;
+    newHeaderCell.textContent = newColumnNumber.toString();
     header.appendChild(newHeaderCell);
     
     // Add data cells to each row
     rows.forEach((row, rowIndex) => {
         const cell = document.createElement('td');
-        cell.dataset.row = rowIndex + 1;
-        cell.dataset.col = header.children.length - 1;
+        cell.dataset.row = rowIndex;
+        cell.dataset.col = newColumnNumber - 1; // Column index is 0-based
         cell.tabIndex = 0;
         cell.textContent = '';
         row.appendChild(cell);
@@ -391,7 +404,14 @@ function addNewColumn() {
     
     // Update data structure
     if (AppState.currentTableData) {
-        AppState.currentTableData.forEach(row => row.push(''));
+        // Update header row
+        if (AppState.currentTableData[0]) {
+            AppState.currentTableData[0].push(newColumnNumber.toString());
+        }
+        // Update data rows
+        for (let i = 1; i < AppState.currentTableData.length; i++) {
+            AppState.currentTableData[i].push('');
+        }
     }
     
     // Re-add event listeners
@@ -404,7 +424,7 @@ function addNewColumn() {
  * Delete selected row
  */
 function deleteSelectedRow() {
-    if (selectedRow < 1) return; // Can't delete header
+    if (selectedRow < 0) return; // Make sure a valid row is selected
     
     const table = document.getElementById('csvTable');
     const rowToDelete = table.querySelector(`tbody tr[data-row="${selectedRow}"]`);
@@ -412,18 +432,17 @@ function deleteSelectedRow() {
     if (rowToDelete && confirm('Delete this row?')) {
         rowToDelete.remove();
         
-        // Update data structure
-        if (AppState.currentTableData && AppState.currentTableData[selectedRow]) {
-            AppState.currentTableData.splice(selectedRow, 1);
+        // Update data structure - add 1 to selectedRow since data starts at index 1 (after numeric header)
+        if (AppState.currentTableData && AppState.currentTableData[selectedRow + 1]) {
+            AppState.currentTableData.splice(selectedRow + 1, 1);
         }
         
         // Re-index remaining rows
         const remainingRows = table.querySelectorAll('tbody tr');
         remainingRows.forEach((row, index) => {
-            const newRowIndex = index + 1;
-            row.dataset.row = newRowIndex;
+            row.dataset.row = index;
             row.querySelectorAll('td').forEach(cell => {
-                cell.dataset.row = newRowIndex;
+                cell.dataset.row = index;
             });
         });
         
@@ -760,7 +779,7 @@ function getCurrentTableData() {
 }
 
 /**
- * Validate a specific column for sequential delta consistency (matches original)
+ * Validate a specific column for sequential delta consistency (updated for numeric headers)
  * @param {number} colIndex - Column index to validate
  * @param {Array} tableData - Current table data
  * @returns {Array} Array of validation issues
@@ -769,15 +788,16 @@ function validateColumn(colIndex, tableData) {
     const issues = [];
     const columnData = [];
     
-    // Extract numerical data from the column - start from row 0 (including header area)
-    for (let rowIndex = 0; rowIndex < tableData.length; rowIndex++) {
+    // Extract numerical data from the column
+    // Since we now use numeric headers, data starts from row 1 (skip the numeric header row)
+    for (let rowIndex = 1; rowIndex < tableData.length; rowIndex++) {
         const cellValue = tableData[rowIndex][colIndex];
         const numValue = parseFloat(cellValue);
         
         if (!isNaN(numValue) && cellValue !== '') {
             columnData.push({
                 value: numValue,
-                row: rowIndex,
+                row: rowIndex - 1, // Adjust row index for display (0-based for data rows)
                 col: colIndex,
                 originalValue: cellValue
             });
@@ -979,7 +999,7 @@ function groupIssuesByColumn(issues) {
 
 /**
  * Apply quick fix for validation issue
- * @param {number} row - Row index
+ * @param {number} row - Row index (display row, 0-based for data rows)
  * @param {number} col - Column index
  * @param {number} suggestedValue - Suggested value
  */
@@ -995,9 +1015,9 @@ function applyQuickFix(row, col, suggestedValue) {
             cell.classList.add('edited-cell');
             editedCells.add(`${row}-${col}`);
             
-            // Update data in memory
-            if (AppState.currentTableData && AppState.currentTableData[row]) {
-                AppState.currentTableData[row][col] = suggestedValue.toFixed(0);
+            // Update data in memory - add 1 to row index since data starts at index 1 (after numeric header)
+            if (AppState.currentTableData && AppState.currentTableData[row + 1]) {
+                AppState.currentTableData[row + 1][col] = suggestedValue.toFixed(0);
             }
             
             updateControlButtons(selectedRow, selectedCol);
