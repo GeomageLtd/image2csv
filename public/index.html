@@ -171,5 +171,25 @@
             </div>
         </div>
     </div>
+
+    <!-- Password Protection Modal -->
+    <div id="passwordModal" class="modal" style="display: none;">
+        <div class="modal-content password-modal-content">
+            <div class="modal-header">
+                <h3 id="passwordModalTitle">🔒 Admin Access Required</h3>
+                <button class="close-btn" onclick="closePasswordModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="passwordModalMessage">Enter the admin password to continue:</p>
+                <div class="password-input-group">
+                    <input type="password" id="passwordInput" placeholder="Enter password" autocomplete="off">
+                    <button class="password-btn" onclick="submitPassword()">Submit</button>
+                </div>
+                <div class="password-error" id="passwordError" style="display: none;">
+                    Incorrect password. Please try again.
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

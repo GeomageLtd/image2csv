@@ -775,10 +775,20 @@ const ResultManager = {
             <div class="results-items">
                 ${results.map(result => `
                     <div class="result-item" data-id="${result.id}">
-                        <div class="result-date">${formatTimestamp(result.timestamp)}</div>
-                        <div class="result-label">
-                            ${result.label || 'Untitled'}
-                            ${result.isBatch ? ` (${result.imageCount} images)` : ''}
+                        <div class="result-content" onclick="ResultManager.loadSavedResult('${result.id}')">
+                            <div class="result-date">${formatTimestamp(result.timestamp)}</div>
+                            <div class="result-label">
+                                ${result.label || 'Untitled'}
+                                ${result.isBatch ? ` (${result.imageCount} images)` : ''}
+                            </div>
+                        </div>
+                        <div class="result-actions">
+                            <button class="result-action-btn rename-btn" onclick="showRenameDialog('${result.id}', '${(result.label || 'Untitled').replace(/'/g, '&#39;')}')" title="Rename">
+                                ✏️
+                            </button>
+                            <button class="result-action-btn delete-btn" onclick="showDeleteDialog('${result.id}')" title="Delete">
+                                🗑️
+                            </button>
                         </div>
                     </div>
                 `).join('')}
@@ -790,23 +800,22 @@ const ResultManager = {
         if (uploadSection) {
             uploadSection.parentNode.insertBefore(listSection, uploadSection);
         }
-        
-        // Add click handlers
-        document.querySelectorAll('.result-item').forEach(item => {
-            item.addEventListener('click', function() {
-                const resultId = this.dataset.id;
-                ResultManager.loadSavedResult(resultId);
-            });
-        });
     },
     
     async deleteResult(resultId) {
         try {
+            console.log('Making DELETE request to:', `/api/result/${resultId}`);
             const response = await fetch(`/api/result/${resultId}`, {
                 method: 'DELETE'
             });
             
+            console.log('Delete response status:', response.status);
+            console.log('Delete response headers:', response.headers);
+            
             if (response.ok) {
+                const result = await response.json();
+                console.log('Delete successful:', result);
+                
                 // Refresh results list
                 this.loadResultsList();
                 
@@ -815,12 +824,70 @@ const ResultManager = {
                     AppState.currentResultId = null;
                     document.getElementById('results').style.display = 'none';
                 }
+                
+                showSuccess('Result deleted successfully!');
             } else {
-                showError('Failed to delete result');
+                const errorText = await response.text();
+                console.error('Delete failed. Status:', response.status, 'Response:', errorText);
+                
+                let errorMessage = 'Failed to delete result';
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    errorMessage = `Server error (${response.status}): ${errorText}`;
+                }
+                
+                showError(errorMessage);
             }
         } catch (error) {
             console.error('Error deleting result:', error);
             showError('Error deleting result: ' + error.message);
+        }
+    },
+    
+    async renameResult(resultId, newLabel) {
+        try {
+            console.log('Making PUT request to:', `/api/result/${resultId}/rename`);
+            console.log('Request body:', { newLabel });
+            
+            const response = await fetch(`/api/result/${resultId}/rename`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ newLabel })
+            });
+            
+            console.log('Rename response status:', response.status);
+            console.log('Rename response headers:', response.headers);
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Rename successful:', result);
+                
+                // Refresh results list
+                this.loadResultsList();
+                
+                // Show success message
+                showSuccess('Result renamed successfully!');
+            } else {
+                const errorText = await response.text();
+                console.error('Rename failed. Status:', response.status, 'Response:', errorText);
+                
+                let errorMessage = 'Failed to rename result';
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    errorMessage = `Server error (${response.status}): ${errorText}`;
+                }
+                
+                showError(errorMessage);
+            }
+        } catch (error) {
+            console.error('Error renaming result:', error);
+            showError('Error renaming result: ' + error.message);
         }
     }
 };
@@ -1486,4 +1553,255 @@ function handleImageViewerKeydown(e) {
 window.openImageViewer = openImageViewer;
 window.closeImageViewer = closeImageViewer;
 window.previousImage = previousImage;
-window.nextImage = nextImage; 
+window.nextImage = nextImage;
+
+/**
+ * Password Protection Functions
+ */
+
+// Global variables for password operations
+let pendingOperation = null;
+let pendingOperationData = null;
+
+/**
+ * Show delete confirmation dialog with password protection
+ * @param {string} resultId - ID of the result to delete
+ */
+function showDeleteDialog(resultId) {
+    pendingOperation = 'delete';
+    pendingOperationData = { resultId };
+    
+    document.getElementById('passwordModalTitle').textContent = '🗑️ Delete Result';
+    document.getElementById('passwordModalMessage').textContent = 'Enter the admin password to delete this result:';
+    
+    showPasswordModal();
+}
+
+/**
+ * Show rename dialog with password protection
+ * @param {string} resultId - ID of the result to rename
+ * @param {string} currentLabel - Current label of the result
+ */
+function showRenameDialog(resultId, currentLabel) {
+    pendingOperation = 'rename';
+    pendingOperationData = { resultId, currentLabel };
+    
+    document.getElementById('passwordModalTitle').textContent = '✏️ Rename Result';
+    document.getElementById('passwordModalMessage').textContent = 'Enter the admin password to rename this result:';
+    
+    showPasswordModal();
+}
+
+/**
+ * Show password modal
+ */
+function showPasswordModal() {
+    const modal = document.getElementById('passwordModal');
+    const passwordInput = document.getElementById('passwordInput');
+    const passwordError = document.getElementById('passwordError');
+    
+    // Clear previous input and errors
+    passwordInput.value = '';
+    passwordError.style.display = 'none';
+    
+    // Show modal
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('show');
+        passwordInput.focus();
+    }, 10);
+    
+    // Add Enter key listener
+    passwordInput.addEventListener('keydown', handlePasswordEnterKey);
+}
+
+/**
+ * Close password modal
+ */
+function closePasswordModal() {
+    const modal = document.getElementById('passwordModal');
+    const passwordInput = document.getElementById('passwordInput');
+    
+    modal.classList.remove('show');
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+    
+    // Remove Enter key listener
+    passwordInput.removeEventListener('keydown', handlePasswordEnterKey);
+    
+    // Clear pending operation
+    pendingOperation = null;
+    pendingOperationData = null;
+}
+
+/**
+ * Handle Enter key in password input
+ * @param {KeyboardEvent} e - Keyboard event
+ */
+function handlePasswordEnterKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        submitPassword();
+    }
+}
+
+/**
+ * Submit password and execute pending operation
+ */
+function submitPassword() {
+    const passwordInput = document.getElementById('passwordInput');
+    const passwordError = document.getElementById('passwordError');
+    const password = passwordInput.value;
+    
+    console.log('Password submitted:', password === 'geomage' ? 'CORRECT' : 'INCORRECT');
+    console.log('Pending operation:', pendingOperation);
+    console.log('Pending operation data:', pendingOperationData);
+    
+    // Check password
+    if (password === 'geomage') {
+        // Store the pending operation data before closing modal
+        const operationToExecute = pendingOperation;
+        const operationData = pendingOperationData;
+        
+        // Password correct, close modal and execute operation
+        closePasswordModal();
+        
+        // Execute operation immediately after modal closes with stored data
+        setTimeout(() => {
+            executeStoredOperation(operationToExecute, operationData);
+        }, 50);
+    } else {
+        // Password incorrect, show error
+        passwordError.style.display = 'block';
+        passwordInput.value = '';
+        passwordInput.focus();
+        
+        // Shake animation for error
+        passwordInput.style.animation = 'shake 0.5s ease-in-out';
+        setTimeout(() => {
+            passwordInput.style.animation = '';
+        }, 500);
+    }
+}
+
+/**
+ * Execute stored operation with provided data
+ */
+function executeStoredOperation(operation, operationData) {
+    console.log('Executing stored operation:', operation, operationData);
+    
+    if (!operation || !operationData) {
+        console.error('No operation or data available');
+        return;
+    }
+    
+    try {
+        switch (operation) {
+            case 'delete':
+                console.log('Executing delete for:', operationData.resultId);
+                executeDelete(operationData.resultId);
+                break;
+            case 'rename':
+                console.log('Executing rename for:', operationData.resultId);
+                executeRename(operationData.resultId, operationData.currentLabel);
+                break;
+            default:
+                console.error('Unknown operation:', operation);
+        }
+    } catch (error) {
+        console.error('Error executing operation:', error);
+        showError('Failed to execute operation: ' + error.message);
+    }
+}
+
+/**
+ * Execute the pending operation after password verification
+ */
+function executePendingOperation() {
+    console.log('Executing pending operation:', pendingOperation, pendingOperationData);
+    
+    if (!pendingOperation || !pendingOperationData) {
+        console.error('No pending operation or data available');
+        return;
+    }
+    
+    try {
+        switch (pendingOperation) {
+            case 'delete':
+                console.log('Executing delete for:', pendingOperationData.resultId);
+                executeDelete(pendingOperationData.resultId);
+                break;
+            case 'rename':
+                console.log('Executing rename for:', pendingOperationData.resultId);
+                executeRename(pendingOperationData.resultId, pendingOperationData.currentLabel);
+                break;
+            default:
+                console.error('Unknown pending operation:', pendingOperation);
+        }
+    } catch (error) {
+        console.error('Error executing pending operation:', error);
+        showError('Failed to execute operation: ' + error.message);
+    }
+    
+    // Clear pending operation
+    pendingOperation = null;
+    pendingOperationData = null;
+}
+
+/**
+ * Execute delete operation
+ * @param {string} resultId - ID of the result to delete
+ */
+function executeDelete(resultId) {
+    console.log('Delete function called for result:', resultId);
+    
+    if (confirm('Are you sure you want to delete this result? This action cannot be undone.')) {
+        console.log('User confirmed deletion, calling ResultManager.deleteResult');
+        try {
+            ResultManager.deleteResult(resultId);
+        } catch (error) {
+            console.error('Error in deleteResult:', error);
+            showError('Failed to delete result: ' + error.message);
+        }
+    } else {
+        console.log('User cancelled deletion');
+    }
+}
+
+/**
+ * Execute rename operation
+ * @param {string} resultId - ID of the result to rename
+ * @param {string} currentLabel - Current label of the result
+ */
+function executeRename(resultId, currentLabel) {
+    console.log('Rename function called for result:', resultId, 'current label:', currentLabel);
+    
+    // Decode HTML entities
+    const decodedLabel = currentLabel.replace(/&#39;/g, "'");
+    const newLabel = prompt('Enter new name for this result:', decodedLabel);
+    
+    console.log('User entered new label:', newLabel);
+    
+    if (newLabel !== null && newLabel.trim() !== '') {
+        if (newLabel.trim() !== decodedLabel) {
+            console.log('Label changed, calling ResultManager.renameResult');
+            try {
+                ResultManager.renameResult(resultId, newLabel.trim());
+            } catch (error) {
+                console.error('Error in renameResult:', error);
+                showError('Failed to rename result: ' + error.message);
+            }
+        } else {
+            console.log('Label unchanged, no action needed');
+        }
+    } else {
+        console.log('User cancelled or entered empty label');
+    }
+}
+
+// Make password functions globally available
+window.showDeleteDialog = showDeleteDialog;
+window.showRenameDialog = showRenameDialog;
+window.closePasswordModal = closePasswordModal;
+window.submitPassword = submitPassword; 

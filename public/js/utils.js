@@ -44,13 +44,73 @@ function fileToBase64WithMeta(file) {
 }
 
 /**
- * Show error message to user
- * @param {string} message - Error message
+ * Show error message
+ * @param {string} message - Error message to display
  */
 function showError(message) {
     const errorDiv = document.getElementById('error');
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+/**
+ * Show success message
+ * @param {string} message - Success message to display
+ */
+function showSuccess(message) {
+    // Create temporary success message
+    const successMsg = document.createElement('div');
+    successMsg.className = 'success-message';
+    successMsg.innerHTML = message;
+    successMsg.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #d4edda;
+        color: #155724;
+        padding: 15px 20px;
+        border-radius: 8px;
+        border: 1px solid #c3e6cb;
+        z-index: 2000;
+        font-weight: 500;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        animation: slideInRight 0.3s ease;
+        max-width: 300px;
+    `;
+    
+    document.body.appendChild(successMsg);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        successMsg.style.animation = 'slideOutRight 0.3s ease';
+        setTimeout(() => {
+            if (successMsg.parentNode) {
+                successMsg.parentNode.removeChild(successMsg);
+            }
+        }, 300);
+    }, 3000);
+    
+    // Add CSS animations if not already present
+    if (!document.getElementById('successAnimations')) {
+        const style = document.createElement('style');
+        style.id = 'successAnimations';
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 
 /**

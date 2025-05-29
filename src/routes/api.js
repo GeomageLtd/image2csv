@@ -71,6 +71,24 @@ router.delete('/result/:id', async (req, res) => {
     }
 });
 
+// Rename a result
+router.put('/result/:id/rename', async (req, res) => {
+    try {
+        const { newLabel } = req.body;
+        const result = await resultService.renameResult(req.params.id, newLabel);
+        res.json(result);
+    } catch (error) {
+        console.error('Error renaming result:', error);
+        if (error.message === 'Result not found') {
+            return res.status(404).json({ error: 'Result not found' });
+        }
+        if (error.message.includes('New label is required')) {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Failed to rename result' });
+    }
+});
+
 // Health check
 router.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });

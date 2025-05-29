@@ -227,6 +227,38 @@ const deleteResult = async (resultId) => {
     return { success: true };
 };
 
+/**
+ * Rename a result's label
+ * @param {string} resultId - Result identifier
+ * @param {string} newLabel - New label for the result
+ * @returns {Object} - Rename result with success status
+ */
+const renameResult = async (resultId, newLabel) => {
+    const result = resultsStorage[resultId];
+    
+    if (!result) {
+        throw new Error('Result not found');
+    }
+    
+    if (!newLabel || typeof newLabel !== 'string' || newLabel.trim().length === 0) {
+        throw new Error('New label is required and must be a non-empty string');
+    }
+    
+    // Update the label
+    resultsStorage[resultId].label = newLabel.trim();
+    resultsStorage[resultId].lastModified = new Date().toISOString();
+    
+    // Save to file
+    await saveResults();
+    
+    return { 
+        success: true, 
+        message: 'Result renamed successfully',
+        newLabel: newLabel.trim(),
+        lastModified: resultsStorage[resultId].lastModified
+    };
+};
+
 module.exports = {
     loadResults,
     saveResults,
@@ -234,5 +266,6 @@ module.exports = {
     getResult,
     getAllResults,
     updateResult,
-    deleteResult
+    deleteResult,
+    renameResult
 }; 
