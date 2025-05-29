@@ -1334,17 +1334,34 @@ function displayCSVTable(csvContent) {
     statusDiv.className = 'edit-status';
     container.appendChild(statusDiv);
     
+    // Create table container for scrolling
+    const tableContainer = document.createElement('div');
+    tableContainer.className = 'csv-table-container';
+    
     // Create table
     const table = document.createElement('table');
     table.className = 'csv-table';
     table.id = 'editableTable';
     
+    // Generate dynamic column widths based on content
+    const columnCount = csvDataArray.length > 0 ? csvDataArray[0].length : 0;
+    const columnWidths = calculateOptimalColumnWidths(csvDataArray, columnCount);
+    
+    // Apply column widths to table
+    if (columnWidths.length > 0) {
+        const colGroup = document.createElement('colgroup');
+        columnWidths.forEach(width => {
+            const col = document.createElement('col');
+            col.style.width = width;
+            colGroup.appendChild(col);
+        });
+        table.appendChild(colGroup);
+    }
+    
     // Create header with numbered columns (1, 2, 3, etc.)
     const thead = document.createElement('thead');
     const headerTr = document.createElement('tr');
     
-    // Generate numbered headers based on the number of columns in first row
-    const columnCount = csvDataArray.length > 0 ? csvDataArray[0].length : 0;
     for (let colIndex = 0; colIndex < columnCount; colIndex++) {
         const th = document.createElement('th');
         th.textContent = (colIndex + 1).toString(); // Headers: "1", "2", "3", etc.
@@ -1369,6 +1386,7 @@ function displayCSVTable(csvContent) {
             td.dataset.row = rowIndex;
             td.dataset.col = colIndex;
             td.setAttribute('tabindex', '0');
+            td.title = cell; // Add tooltip for full content
             
             // Add edit indicator
             const indicator = document.createElement('div');
@@ -1385,7 +1403,8 @@ function displayCSVTable(csvContent) {
     }
     
     table.appendChild(tbody);
-    container.appendChild(table);
+    tableContainer.appendChild(table);
+    container.appendChild(tableContainer);
     
     // Add keyboard navigation
     addKeyboardNavigation(table);
@@ -1393,6 +1412,45 @@ function displayCSVTable(csvContent) {
     // Reset unsaved changes flag
     hasUnsavedChanges = false;
     updateEditStatus();
+}
+
+/**
+ * Calculate optimal column widths based on content
+ * @param {Array} data - 2D array of data
+ * @param {number} columnCount - Number of columns
+ * @returns {Array} Array of width percentages
+ */
+function calculateOptimalColumnWidths(data, columnCount) {
+    if (columnCount === 0) return [];
+    
+    // Calculate content length for each column
+    const columnLengths = new Array(columnCount).fill(0);
+    
+    data.forEach(row => {
+        row.forEach((cell, colIndex) => {
+            if (colIndex < columnCount) {
+                const cellLength = String(cell).length;
+                columnLengths[colIndex] = Math.max(columnLengths[colIndex], cellLength);
+            }
+        });
+    });
+    
+    // Add header length (column numbers)
+    for (let i = 0; i < columnCount; i++) {
+        columnLengths[i] = Math.max(columnLengths[i], String(i + 1).length);
+    }
+    
+    // Calculate total length
+    const totalLength = columnLengths.reduce((sum, length) => sum + length, 0);
+    
+    // Convert to percentages with minimum width
+    const minWidth = Math.max(8, 100 / columnCount * 0.5); // Minimum 8% or half of equal distribution
+    const widths = columnLengths.map(length => {
+        const percentage = totalLength > 0 ? (length / totalLength) * 100 : 100 / columnCount;
+        return Math.max(minWidth, percentage) + '%';
+    });
+    
+    return widths;
 }
 
 /**

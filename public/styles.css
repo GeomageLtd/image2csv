@@ -309,33 +309,49 @@ textarea:focus {
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    table-layout: fixed;
+    display: table;
+}
+
+.csv-table-container {
     max-height: 500px;
     overflow-y: auto;
-    display: block;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
 }
 
 .csv-table thead {
     position: sticky;
     top: 0;
     z-index: 10;
+    background: white;
 }
 
 .csv-table tbody {
-    display: block;
-    max-height: 400px;
-    overflow-y: auto;
+    display: table-row-group;
 }
 
 .csv-table tr {
-    display: table;
+    display: table-row;
     width: 100%;
-    table-layout: fixed;
 }
 
 .csv-table th, .csv-table td {
-    padding: 12px 15px;
-    text-align: left;
+    padding: 8px 12px;
+    text-align: center;
+    border-right: 1px solid #dee2e6;
     border-bottom: 1px solid #dee2e6;
+    word-wrap: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 60px;
+    width: auto;
+}
+
+.csv-table th:last-child,
+.csv-table td:last-child {
+    border-right: none;
 }
 
 .csv-table th {
@@ -343,8 +359,12 @@ textarea:focus {
     color: white;
     font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.9em;
+    font-size: 0.8em;
     letter-spacing: 0.5px;
+    padding: 12px 8px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .csv-table tr:hover {
@@ -512,12 +532,42 @@ textarea:focus {
         gap: 15px;
     }
     
+    .csv-table-container {
+        max-height: 400px;
+        overflow-x: auto;
+    }
+    
     .csv-table {
-        font-size: 0.9em;
+        font-size: 0.8em;
+        min-width: 600px;
     }
     
     .csv-table th, .csv-table td {
-        padding: 8px 10px;
+        padding: 6px 8px;
+        font-size: 0.9em;
+        min-width: 50px;
+    }
+    
+    .csv-table th {
+        font-size: 0.7em;
+        padding: 8px 6px;
+    }
+    
+    /* Make table horizontally scrollable on mobile */
+    .csv-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Adjust table controls for mobile */
+    .table-controls {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .table-control-btn {
+        font-size: 0.8em;
+        padding: 6px 12px;
     }
 }
 /* Add these updated styles to your styles.css file */
