@@ -750,6 +750,7 @@ const ResultManager = {
             const response = await fetch('/api/results');
             if (response.ok) {
                 const results = await response.json();
+                this.allResults = results; // Store all results for search
                 this.displayResultsList(results);
             }
         } catch (error) {
@@ -757,28 +758,54 @@ const ResultManager = {
         }
     },
     
-    displayResultsList(results) {
+    displayResultsList(results, searchTerm = '') {
         // Remove existing results list if any
         const existingList = document.getElementById('resultsList');
         if (existingList) {
             existingList.remove();
         }
         
-        if (results.length === 0) return;
+        if (!this.allResults || this.allResults.length === 0) return;
+        
+        // Filter results based on search term
+        const filteredResults = searchTerm ? this.filterResults(this.allResults, searchTerm) : results;
         
         const listSection = document.createElement('div');
         listSection.id = 'resultsList';
         listSection.className = 'results-list';
         
+        const searchResultsText = searchTerm ? 
+            `<small class="search-results-count">${filteredResults.length} of ${this.allResults.length} results</small>` : '';
+        
         listSection.innerHTML = `
-            <h3>📚 Saved Results</h3>
-            <div class="results-items">
-                ${results.map(result => `
+            <div class="results-header">
+                <h3>📚 Saved Results</h3>
+                <div class="search-container">
+                    <div class="search-input-group">
+                        <input type="text" 
+                               id="resultsSearch" 
+                               class="search-input" 
+                               placeholder="🔍 Search results..." 
+                               value="${searchTerm}"
+                               autocomplete="off">
+                        <button class="search-clear-btn" 
+                                id="searchClearBtn" 
+                                onclick="ResultManager.clearSearch()"
+                                title="Clear search"
+                                style="display: ${searchTerm ? 'flex' : 'none'}">
+                            ✕
+                        </button>
+                    </div>
+                    ${searchResultsText}
+                </div>
+            </div>
+            <div class="results-items" id="resultsItemsContainer">
+                ${filteredResults.length > 0 ? filteredResults.map(result => `
                     <div class="result-item" data-id="${result.id}">
                         <div class="result-content" onclick="ResultManager.loadSavedResult('${result.id}')">
                             <div class="result-date">${formatTimestamp(result.timestamp)}</div>
                             <div class="result-label">
-                                ${result.label || 'Untitled'}
+                                ${this.highlightSearchTerm(result.label || 'Untitled', searchTerm)}
                                 ${result.isBatch ? ` (${result.imageCount} images)` : ''}
                             </div>
                         </div>
@@ -791,7 +818,11 @@ const ResultManager = {
                             </button>
                         </div>
                     </div>
-                `).join('')}
+                `).join('') : `
+                    <div class="no-results">
+                        ${searchTerm ? `🔍 No results found for "${searchTerm}"` : '📄 No saved results yet'}
+                    </div>
+                `}
             </div>
         `;
         
@@ -800,6 +831,126 @@ const ResultManager = {
         if (uploadSection) {
             uploadSection.parentNode.insertBefore(listSection, uploadSection);
         }
+        
+        // Setup search functionality
+        this.setupSearch();
+    },
+    
+    /**
+     * Setup search input event listeners
+     */
+    setupSearch() {
+        const searchInput = document.getElementById('resultsSearch');
+        if (searchInput) {
+            // Remove existing event listeners to avoid duplicates
+            searchInput.removeEventListener('input', this.handleSearchInput);
+            searchInput.removeEventListener('keydown', this.handleSearchKeydown);
+            
+            // Add debounced search
+            searchInput.addEventListener('input', this.handleSearchInput.bind(this));
+            searchInput.addEventListener('keydown', this.handleSearchKeydown.bind(this));
+        }
+    },
+    
+    /**
+     * Handle search input with debouncing
+     */
+    handleSearchInput(e) {
+        const searchTerm = e.target.value.trim();
+        
+        // Clear existing timeout
+        if (this.searchTimeout) {
+            clearTimeout(this.searchTimeout);
+        }
+        
+        // Debounce search to avoid too many updates
+        this.searchTimeout = setTimeout(() => {
+            this.performSearch(searchTerm);
+        }, 300);
+        
+        // Update clear button visibility
+        const clearBtn = document.getElementById('searchClearBtn');
+        if (clearBtn) {
+            clearBtn.style.display = searchTerm ? 'flex' : 'none';
+        }
+    },
+    
+    /**
+     * Handle search input keyboard events
+     */
+    handleSearchKeydown(e) {
+        if (e.key === 'Escape') {
+            this.clearSearch();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const searchTerm = e.target.value.trim();
+            this.performSearch(searchTerm);
+        }
+    },
+    
+    /**
+     * Perform search and update display
+     */
+    performSearch(searchTerm) {
+        console.log('Searching for:', searchTerm);
+        this.displayResultsList(this.allResults, searchTerm);
+    },
+    
+    /**
+     * Clear search and show all results
+     */
+    clearSearch() {
+        const searchInput = document.getElementById('resultsSearch');
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.focus();
+        }
+        this.displayResultsList(this.allResults, '');
+    },
+    
+    /**
+     * Filter results based on search term
+     */
+    filterResults(results, searchTerm) {
+        if (!searchTerm) return results;
+        
+        const term = searchTerm.toLowerCase();
+        
+        return results.filter(result => {
+            // Search in label
+            const label = (result.label || 'untitled').toLowerCase();
+            if (label.includes(term)) return true;
+            
+            // Search in formatted date
+            const dateStr = formatTimestamp(result.timestamp).toLowerCase();
+            if (dateStr.includes(term)) return true;
+            
+            // Search in full date
+            const fullDate = new Date(result.timestamp).toLocaleDateString().toLowerCase();
+            if (fullDate.includes(term)) return true;
+            
+            // Search by image count
+            if (term.includes('image')) {
+                const imageCountStr = `${result.imageCount} image${result.imageCount > 1 ? 's' : ''}`;
+                if (imageCountStr.toLowerCase().includes(term)) return true;
+            }
+            
+            // Search by batch type
+            if (result.isBatch && (term.includes('batch') || term.includes('multiple'))) return true;
+            if (!result.isBatch && (term.includes('single') || term.includes('one'))) return true;
+            
+            return false;
+        });
+    },
+    
+    /**
+     * Highlight search term in text
+     */
+    highlightSearchTerm(text, searchTerm) {
+        if (!searchTerm || !text) return text;
+        
+        const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return text.replace(regex, '<mark class="search-highlight">$1</mark>');
     },
     
     async deleteResult(resultId) {
