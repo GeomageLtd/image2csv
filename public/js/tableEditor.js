@@ -557,15 +557,13 @@ async function saveTableChanges() {
 async function updateResultOnServer() {
     if (!AppState.currentResultId || !AppState.csvData) return;
     
-    const response = await fetch(`/api/update-result`, {
-        method: 'POST',
+    const response = await fetch(`/api/update-result/${AppState.currentResultId}`, {
+        method: 'PUT',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            resultId: AppState.currentResultId,
-            csvData: AppState.csvData,
-            timestamp: new Date().toISOString()
+            csvData: AppState.csvData
         })
     });
     
