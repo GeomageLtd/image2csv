@@ -550,16 +550,24 @@ const DisplayManager = {
         displayContainer.className = imageFiles.length > 1 ? 'multiple-images' : '';
         
         Array.from(imageFiles).forEach((file, index) => {
-            const imageUrl = URL.createObjectURL(file);
+            // Use cropped version if available, otherwise use original
+            const fileToDisplay = AppState.croppedFiles.has(index) ? AppState.croppedFiles.get(index) : file;
+            const imageUrl = URL.createObjectURL(fileToDisplay);
             const result = results[index];
             
             const imageItem = document.createElement('div');
             imageItem.className = 'image-item';
+            
+            // Add a visual indicator if the image was cropped
+            const croppedIndicator = AppState.croppedFiles.has(index) ? 
+                '<span class="cropped-indicator" title="This image was cropped">✂️ Cropped</span>' : '';
+            
             imageItem.innerHTML = `
                 <img src="${imageUrl}" alt="${file.name}" ondblclick="openInNewTab('${imageUrl}')">
                 <div class="image-label">
                     ${file.name} 
                     ${result && result.success ? '✅' : '❌'}
+                    ${croppedIndicator}
                 </div>
             `;
             
