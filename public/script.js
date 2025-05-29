@@ -1874,7 +1874,7 @@ function validateColumn(colIndex) {
     // Calculate deltas between consecutive values
     const deltas = [];
     for (let i = 0; i < columnData.length - 1; i++) {
-        const delta = Math.abs(columnData[i + 1].value - columnData[i].value);
+        const delta = columnData[i + 1].value - columnData[i].value;
         deltas.push({
             delta: delta,
             fromRow: columnData[i].row,
@@ -1890,14 +1890,11 @@ function validateColumn(colIndex) {
     const sortedDeltas = deltas.map(d => d.delta).sort((a, b) => a - b);
     const medianDelta = calculateMedian(sortedDeltas);
     
-    // Define tolerance (you can adjust this threshold)
-    const tolerance = medianDelta * 0.5; // 50% tolerance
-    const minTolerance = 0.01; // Minimum absolute tolerance
-    const finalTolerance = Math.max(tolerance, minTolerance);
 
+    finalTolerance = 0;
     // Find outlier deltas
     deltas.forEach(deltaInfo => {
-        const deviation = Math.abs(deltaInfo.delta - medianDelta);
+        const deviation = deltaInfo.delta - medianDelta;
         
         if (deviation > finalTolerance) {
             // Determine which cell is more likely to be the issue
@@ -2001,10 +1998,10 @@ function highlightIssues(issues) {
  */
 function createTooltipText(issue) {
     return `Inconsistent value detected!\n` +
-           `Expected delta: ~${issue.expectedDelta.toFixed(2)}\n` +
-           `Actual delta: ${issue.actualDelta.toFixed(2)}\n` +
-           `Deviation: ${issue.deviation.toFixed(2)}\n` +
-           `Suggested value: ${issue.suggestion.toFixed(2)}\n` +
+           `Expected delta: ~${issue.expectedDelta.toFixed(0)}\n` +
+           `Actual delta: ${issue.actualDelta.toFixed(0)}\n` +
+           `Deviation: ${issue.deviation.toFixed(0)}\n` +
+           `Suggested value: ${issue.suggestion.toFixed(0)}\n` +
            `From: ${issue.fromValue} → To: ${issue.toValue}`;
 }
 
@@ -2046,7 +2043,7 @@ function showValidationSummary(issues) {
                             ${colIssues.map(issue => `
                                 <li>
                                     Row ${issue.row + 1}: Value ${issue.toValue} 
-                                    (expected ~${issue.suggestion.toFixed(2)})
+                                    (expected ~${issue.suggestion.toFixed(0)})
                                     <button class="fix-btn" onclick="applyQuickFix(${issue.row}, ${issue.col}, ${issue.suggestion})">
                                         Quick Fix
                                     </button>
@@ -2094,15 +2091,15 @@ function groupIssuesByColumn(issues) {
  * @param {number} suggestedValue - Suggested value
  */
 function applyQuickFix(row, col, suggestedValue) {
-    if (confirm(`Replace value in Row ${row + 1}, Column ${col + 1} with ${suggestedValue.toFixed(2)}?`)) {
+    if (confirm(`Replace value in Row ${row + 1}, Column ${col + 1} with ${suggestedValue.toFixed(0)}?`)) {
         // Update data array
-        csvDataArray[row][col] = suggestedValue.toFixed(2);
+        csvDataArray[row][col] = suggestedValue.toFixed(0);
         
         // Update cell display
         const table = document.getElementById('editableTable');
         const cell = table.querySelector(`td[data-row="${row}"][data-col="${col}"]`);
         if (cell) {
-            cell.textContent = suggestedValue.toFixed(2);
+            cell.textContent = suggestedValue.toFixed(0);
             
             // Add edit indicator
             const indicator = document.createElement('div');
