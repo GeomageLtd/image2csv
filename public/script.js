@@ -2463,11 +2463,18 @@ let croppedFiles = new Map(); // Store cropped versions
  * @param {number} imageIndex - Index of the image to crop
  */
 function openCropModal(imageIndex) {
-    const imageFiles = document.getElementById('imageFiles').files;
-    if (!imageFiles || imageIndex >= imageFiles.length) return;
+    // Use processed files if available, otherwise fall back to original files
+    const filesToUse = processedFiles.length > 0 ? processedFiles : Array.from(document.getElementById('imageFiles').files);
     
-    currentCropFile = imageFiles[imageIndex];
+    if (!filesToUse || imageIndex >= filesToUse.length) {
+        console.error('Invalid image index or no files available for cropping');
+        return;
+    }
+    
+    currentCropFile = filesToUse[imageIndex];
     currentCropIndex = imageIndex;
+    
+    console.log('Opening crop modal for:', currentCropFile.name, 'Index:', imageIndex);
     
     // Show modal
     const modal = document.getElementById('cropModal');
@@ -2484,7 +2491,13 @@ function openCropModal(imageIndex) {
  * Initialize crop canvas with image
  */
 function initializeCropCanvas() {
-    if (!currentCropFile) return;
+    if (!currentCropFile) {
+        console.error('No current crop file available');
+        updateCropInfo('Error: No image file available for cropping');
+        return;
+    }
+    
+    console.log('Initializing crop canvas for file:', currentCropFile.name, 'Type:', currentCropFile.type);
     
     cropCanvas = document.getElementById('cropCanvas');
     cropCtx = cropCanvas.getContext('2d');
@@ -2492,6 +2505,8 @@ function initializeCropCanvas() {
     // Load image
     originalImage = new Image();
     originalImage.onload = function() {
+        console.log('Image loaded successfully:', this.naturalWidth, 'x', this.naturalHeight);
+        
         // Calculate canvas size to fit image while maintaining aspect ratio
         const maxWidth = 800;
         const maxHeight = 600;
@@ -2520,11 +2535,26 @@ function initializeCropCanvas() {
         
         // Update info
         updateCropInfo('Click and drag to select crop area');
+        
+        console.log('Crop canvas initialized successfully');
+    };
+    
+    originalImage.onerror = function() {
+        console.error('Failed to load image for cropping');
+        updateCropInfo('Error: Failed to load image');
     };
     
     // Use cropped version if exists, otherwise original
     const fileToShow = croppedFiles.get(currentCropIndex) || currentCropFile;
-    originalImage.src = URL.createObjectURL(fileToShow);
+    
+    try {
+        const imageUrl = URL.createObjectURL(fileToShow);
+        console.log('Created object URL for cropping:', imageUrl);
+        originalImage.src = imageUrl;
+    } catch (error) {
+        console.error('Error creating object URL for crop file:', error);
+        updateCropInfo('Error: Cannot display image for cropping');
+    }
 }
 
 /**
