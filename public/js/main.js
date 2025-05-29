@@ -1955,4 +1955,177 @@ function executeRename(resultId, currentLabel) {
 window.showDeleteDialog = showDeleteDialog;
 window.showRenameDialog = showRenameDialog;
 window.closePasswordModal = closePasswordModal;
-window.submitPassword = submitPassword; 
+window.submitPassword = submitPassword;
+
+/**
+ * Start New Process - Clear all form data and reset UI
+ */
+function startNewProcess() {
+    // Confirm if there's existing data
+    const hasData = AppState.processedFiles.length > 0 || 
+                   document.getElementById('apiKey').value.trim() ||
+                   document.getElementById('textPrompt').value !== document.getElementById('textPrompt').defaultValue ||
+                   document.getElementById('resultLabel').value.trim();
+    
+    if (hasData) {
+        const confirmed = confirm(
+            '🔄 Start New Process?\n\n' +
+            'This will clear all current data including:\n' +
+            '• Selected images\n' +
+            '• Form fields\n' +
+            '• Processing results\n' +
+            '\nAre you sure you want to continue?'
+        );
+        
+        if (!confirmed) {
+            return;
+        }
+    }
+    
+    try {
+        console.log('🔄 Starting new process - clearing all data...');
+        
+        // Clear AppState
+        AppState.processedFiles = [];
+        AppState.originalFileList = [];
+        AppState.croppedFiles.clear();
+        AppState.csvData = null;
+        AppState.currentResultId = null;
+        
+        // Clear form fields
+        document.getElementById('apiKey').value = '';
+        document.getElementById('resultLabel').value = '';
+        
+        // Reset text prompt to default
+        const textPrompt = document.getElementById('textPrompt');
+        textPrompt.value = "I'll send to you screenshot with tables. This table contains only numerical values. Please parse it and show it as table. I don't need any other text, just the table. number of columns shouldn't be more than 10.";
+        textPrompt.style.height = 'auto';
+        textPrompt.style.height = textPrompt.scrollHeight + 'px';
+        
+        // Clear file input
+        const fileInput = document.getElementById('imageFiles');
+        fileInput.value = '';
+        
+        // Hide file info
+        const fileInfo = document.getElementById('fileInfo');
+        fileInfo.style.display = 'none';
+        
+        // Hide and clear preview
+        ImagePreview.hide();
+        const previewContainer = document.getElementById('imagePreview');
+        if (previewContainer) {
+            previewContainer.innerHTML = '';
+        }
+        
+        // Hide batch progress
+        const batchProgress = document.getElementById('batchProgress');
+        if (batchProgress) {
+            batchProgress.style.display = 'none';
+        }
+        
+        // Hide results
+        const results = document.getElementById('results');
+        if (results) {
+            results.style.display = 'none';
+        }
+        
+        // Clear any displayed images
+        const imageGallery = document.getElementById('imageGallery');
+        if (imageGallery) {
+            imageGallery.innerHTML = '';
+        }
+        
+        // Clear CSV table
+        const csvContainer = document.getElementById('csvTableContainer');
+        if (csvContainer) {
+            csvContainer.innerHTML = '';
+        }
+        
+        // Hide any error messages
+        const errorDiv = document.getElementById('error');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+        
+        // Hide loading spinner
+        setLoading(false);
+        
+        // Close any open modals
+        if (typeof closeCropModal === 'function') {
+            closeCropModal();
+        }
+        if (typeof closePasswordModal === 'function') {
+            closePasswordModal();
+        }
+        if (typeof closeImageViewer === 'function') {
+            closeImageViewer();
+        }
+        
+        // Focus on API key input for new session
+        setTimeout(() => {
+            document.getElementById('apiKey').focus();
+        }, 100);
+        
+        // Show success notification
+        showNewProcessNotification();
+        
+        console.log('✅ New process started successfully');
+        
+    } catch (error) {
+        console.error('Error starting new process:', error);
+        showError('Failed to start new process: ' + error.message);
+    }
+}
+
+/**
+ * Show notification that new process was started
+ */
+function showNewProcessNotification() {
+    // Create temporary notification
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(45deg, #28a745, #20c997);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        z-index: 2000;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        font-weight: 500;
+        animation: slideInRight 0.3s ease;
+    `;
+    notification.innerHTML = `
+        ✨ New Process Started<br>
+        <small>Ready for new image processing session</small>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+    
+    // Add CSS animations if not already present
+    if (!document.getElementById('notificationStyles')) {
+        const style = document.createElement('style');
+        style.id = 'notificationStyles';
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// Make startNewProcess globally available
+window.startNewProcess = startNewProcess; 
