@@ -87,15 +87,26 @@
         <div class="crop-modal-content">
             <div class="crop-modal-header">
                 <h3>🔧 Crop Image</h3>
+                <div class="crop-instructions">
+                    <span>🖱️ Drag to select</span>
+                    <span>🔍 Scroll to zoom</span>
+                    <span>✋ Drag to pan</span>
+                </div>
                 <button class="crop-close-btn" onclick="closeCropModal()">&times;</button>
             </div>
-            <div class="crop-canvas-container">
+            <div class="crop-canvas-container" id="cropCanvasContainer">
                 <canvas id="cropCanvas"></canvas>
                 <div class="crop-overlay">
                     <div class="crop-selection" id="cropSelection"></div>
                 </div>
             </div>
             <div class="crop-controls">
+                <div class="crop-zoom-controls">
+                    <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+                    <span class="zoom-level" id="zoomLevel">100%</span>
+                    <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+                    <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">🔄</button>
+                </div>
                 <button class="crop-btn secondary" onclick="resetCrop()">🔄 Reset</button>
                 <button class="crop-btn secondary" onclick="closeCropModal()">❌ Cancel</button>
                 <button class="crop-btn primary" onclick="applyCrop()">✂️ Apply Crop</button>
