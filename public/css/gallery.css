@@ -1,0 +1,525 @@
+/* ================================
+   IMAGE GALLERY & VIEWER STYLES
+   Image Previews, Gallery Layout, Image Viewer
+   ================================ */
+
+/* Image Preview (Upload Stage) */
+.image-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.preview-item {
+    position: relative;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 120px;
+}
+
+.preview-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+    transform: translateY(-2px);
+}
+
+.preview-item:active {
+    transform: translateY(0);
+}
+
+.preview-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+}
+
+.preview-label {
+    padding: 12px;
+    background: #f8f9fa;
+    font-size: 0.9em;
+    color: #495057;
+    border-top: 1px solid #dee2e6;
+    font-weight: 500;
+}
+
+/* Preview item interactive hints */
+.preview-item::after {
+    content: "Double-click to open in new tab";
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.preview-item:hover::after {
+    opacity: 1;
+}
+
+/* Processing status for batch processing */
+.processing-status {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.75em;
+    font-weight: bold;
+    color: white;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.status-pending {
+    background: #ffc107;
+}
+
+.status-processing {
+    background: #007bff;
+}
+
+.status-complete {
+    background: #28a745;
+}
+
+.status-error {
+    background: #dc3545;
+}
+
+/* Batch Progress */
+.batch-progress {
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.progress-text {
+    text-align: center;
+    font-size: 0.9em;
+    color: #495057;
+}
+
+/* Remove/Crop Buttons on Preview Items */
+.remove-button {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(220, 53, 69, 0.9);
+    color: white;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.7em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    opacity: 0.8;
+}
+
+.remove-button:hover {
+    background: rgba(220, 53, 69, 1);
+    transform: scale(1.1);
+    opacity: 1;
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.remove-button:active {
+    transform: scale(0.95);
+}
+
+.preview-item .crop-button {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0, 255, 136, 0.9);
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.preview-item .crop-button:hover {
+    background: rgba(0, 255, 136, 1);
+}
+
+/* Show buttons on hover */
+.preview-item:hover .remove-button,
+.preview-item:hover .crop-button {
+    opacity: 1;
+}
+
+/* TIFF Page Styling */
+.tiff-page-item {
+    border: 2px solid #17a2b8 !important;
+    background: linear-gradient(135deg, #f8fdff 0%, #e3f7fd 100%) !important;
+}
+
+.tiff-page-item:hover {
+    border-color: #138496 !important;
+    box-shadow: 0 5px 15px rgba(23, 162, 184, 0.3) !important;
+}
+
+.tiff-page-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: linear-gradient(45deg, #17a2b8, #138496);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 0.7em;
+    font-weight: bold;
+    z-index: 15;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.tiff-page-item .preview-label {
+    background: linear-gradient(135deg, #e3f7fd 0%, #d1ecf1 100%) !important;
+    color: #0c5460 !important;
+    font-weight: 600;
+    border-top: 1px solid #bee5eb !important;
+}
+
+.tiff-page-item .tiff-page-badge {
+    top: 36px;
+    right: 8px;
+}
+
+/* TIFF animation */
+#tiffInfo {
+    animation: tiffInfoSlide 0.3s ease-in-out;
+}
+
+@keyframes tiffInfoSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Results Gallery Layout */
+.image-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 15px;
+    max-width: 100%;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+    border: 2px solid transparent;
+}
+
+.image-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: #667eea;
+}
+
+.image-item img {
+    width: 100%;
+    height: 200px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    object-fit: cover;
+}
+
+.image-item img:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.image-label {
+    margin-top: 8px;
+    padding: 8px;
+    font-size: 0.85em;
+    color: #6c757d;
+    text-align: center;
+    font-weight: 500;
+    background: #f8f9fa;
+    width: 100%;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Cropped indicator in results */
+.cropped-indicator {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 6px;
+    background: linear-gradient(45deg, #28a745, #20c997);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: 600;
+    vertical-align: top;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+}
+
+.image-label .cropped-indicator {
+    margin-left: 5px;
+}
+
+/* Gallery Container Layout */
+#displayImages {
+    display: flex;
+    flex-direction: row;
+    gap: 15px;
+    align-items: flex-start;
+    width: 100%;
+    overflow-x: auto;
+    padding: 10px 0;
+    scroll-behavior: smooth;
+}
+
+#displayImages.multiple-images {
+    display: flex;
+    flex-direction: row;
+    gap: 15px;
+    overflow-x: auto;
+    padding: 10px 0;
+}
+
+#displayImages.multiple-images .image-item {
+    flex: 0 0 250px;
+    min-width: 250px;
+    margin-bottom: 0;
+}
+
+#displayImages:not(.multiple-images) {
+    justify-content: center;
+}
+
+#displayImages:not(.multiple-images) .image-item {
+    flex: 0 0 300px;
+    max-width: 300px;
+}
+
+/* Gallery and Expanded Views */
+.image-gallery-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.image-gallery-view.hidden {
+    display: none;
+}
+
+/* In-Place Image Viewer */
+.image-expanded-view {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    background: #f8f9fa;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid #667eea;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+}
+
+.image-expanded-view.show {
+    display: flex;
+    animation: expandIn 0.3s ease;
+}
+
+.expanded-header {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.expanded-header h4 {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.expanded-back-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.expanded-back-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.expanded-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #ffffff;
+    position: relative;
+    overflow: hidden;
+}
+
+.expanded-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.expanded-info {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.expanded-navigation {
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    flex-shrink: 0;
+}
+
+.expanded-nav-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.expanded-nav-btn:hover:not(:disabled) {
+    background: #5a6fd8;
+    transform: scale(1.1);
+}
+
+.expanded-nav-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.expanded-counter {
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    min-width: 60px;
+    text-align: center;
+}
+
+/* Animation for expand */
+@keyframes expandIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Image section layout adjustments */
+.result-section.image-section {
+    min-height: 500px;
+    max-height: 700px;
+    display: flex;
+    flex-direction: column;
+}
+
+.result-section.image-section h3 {
+    flex-shrink: 0;
+    margin-bottom: 15px;
+}
+
+#displayImages {
+    flex: 1;
+    min-height: 400px;
+} 
