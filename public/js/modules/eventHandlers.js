@@ -65,7 +65,7 @@ const EventHandlers = {
         
         const filesToProcess = AppState.processedFiles.length > 0 ? AppState.processedFiles : [];
         if (filesToProcess.length === 0) {
-            showError('Please select at least one image file');
+            showError('Please select or paste at least one image to process');
             return;
         }
         

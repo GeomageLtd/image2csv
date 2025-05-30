@@ -4,6 +4,16 @@
  */
 
 const ImagePreview = {
+    isClipboardListenerActive: false,
+
+    /**
+     * Initialize clipboard functionality (called once on app start)
+     */
+    initialize() {
+        this.setupClipboardListeners();
+        console.log('📋 ImagePreview initialized with clipboard support');
+    },
+
     async showForSelection(files) {
         // Clear any existing cropped files from previous selections
         AppState.croppedFiles.clear();
@@ -27,7 +37,217 @@ const ImagePreview = {
         if (batchProgress) {
             batchProgress.style.display = 'none';
         }
+        
         AppState.croppedFiles.clear();
+    },
+
+    /**
+     * Setup clipboard event listeners (always active)
+     */
+    setupClipboardListeners() {
+        if (this.isClipboardListenerActive) return;
+        
+        // Add paste event listener to document
+        document.addEventListener('paste', this.handleClipboardPaste.bind(this));
+        
+        // Add visual feedback for paste events
+        document.addEventListener('keydown', this.handleKeyDown.bind(this));
+        document.addEventListener('keyup', this.handleKeyUp.bind(this));
+        
+        this.isClipboardListenerActive = true;
+        console.log('📋 Clipboard listeners activated');
+    },
+
+    /**
+     * Remove clipboard event listeners
+     */
+    removeClipboardListeners() {
+        if (!this.isClipboardListenerActive) return;
+        
+        document.removeEventListener('paste', this.handleClipboardPaste.bind(this));
+        document.removeEventListener('keydown', this.handleKeyDown.bind(this));
+        document.removeEventListener('keyup', this.handleKeyUp.bind(this));
+        
+        this.isClipboardListenerActive = false;
+        console.log('📋 Clipboard listeners deactivated');
+    },
+
+    /**
+     * Handle keyboard down events for visual feedback
+     */
+    handleKeyDown(e) {
+        // Show visual feedback when Ctrl/Cmd + V is pressed
+        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+            const clipboardArea = document.getElementById('clipboardPasteArea');
+            if (clipboardArea) {
+                clipboardArea.classList.add('paste-active');
+            }
+        }
+    },
+
+    /**
+     * Handle keyboard up events for visual feedback
+     */
+    handleKeyUp(e) {
+        // Remove visual feedback when keys are released
+        if (e.key === 'Control' || e.key === 'Meta' || e.key === 'v') {
+            const clipboardArea = document.getElementById('clipboardPasteArea');
+            if (clipboardArea) {
+                clipboardArea.classList.remove('paste-active');
+            }
+        }
+    },
+
+    /**
+     * Handle clipboard paste events
+     */
+    async handleClipboardPaste(e) {
+        // Check if we're in an input field - if so, allow normal paste behavior
+        const activeElement = document.activeElement;
+        if (activeElement && (
+            activeElement.tagName === 'INPUT' || 
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.contentEditable === 'true'
+        )) {
+            return; // Allow normal paste behavior in text inputs
+        }
+
+        // Prevent default paste behavior for clipboard images
+        e.preventDefault();
+        e.stopPropagation();
+
+        const clipboardData = e.clipboardData || window.clipboardData;
+        
+        if (!clipboardData) {
+            this.showPasteNotification('Clipboard access not available', false);
+            return;
+        }
+
+        const items = clipboardData.items;
+        let imageFound = false;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            
+            if (item.type.indexOf('image') !== -1) {
+                imageFound = true;
+                const blob = item.getAsFile();
+                
+                if (blob) {
+                    await this.addImageFromClipboard(blob);
+                    break;
+                }
+            }
+        }
+
+        if (!imageFound) {
+            this.showPasteNotification('No image found in clipboard. Please copy an image first.', false);
+        }
+    },
+
+    /**
+     * Add image from clipboard to the preview
+     */
+    async addImageFromClipboard(blob) {
+        try {
+            // Generate a filename for the pasted image
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `Screenshot_${timestamp}.png`;
+            
+            // Create File object from blob
+            const file = new File([blob], filename, {
+                type: blob.type || 'image/png',
+                lastModified: Date.now()
+            });
+
+            // Initialize arrays if empty
+            if (!AppState.processedFiles) AppState.processedFiles = [];
+            if (!AppState.originalFileList) AppState.originalFileList = [];
+
+            // Add to processed files array
+            AppState.processedFiles.push(file);
+            AppState.originalFileList.push(file);
+
+            // Update file count display and show file info
+            this.updateFileCountAfterPaste();
+            this.showFileInfoIfHidden();
+
+            // Show image previews if we now have files
+            if (AppState.processedFiles.length > 0) {
+                await this.showForSelection(AppState.processedFiles);
+            }
+
+            // Update result label
+            updateResultLabel();
+
+            // Show success notification
+            this.showPasteNotification(`📷 Screenshot pasted successfully as "${filename}"`, true);
+
+            console.log('📋 Image pasted from clipboard:', {
+                filename: filename,
+                size: file.size,
+                type: file.type,
+                totalFiles: AppState.processedFiles.length
+            });
+
+        } catch (error) {
+            console.error('Error adding image from clipboard:', error);
+            this.showPasteNotification('Error processing pasted image: ' + error.message, false);
+        }
+    },
+
+    /**
+     * Show file info section if it's hidden
+     */
+    showFileInfoIfHidden() {
+        const fileInfo = document.getElementById('fileInfo');
+        if (fileInfo) {
+            fileInfo.style.display = 'block';
+        }
+    },
+
+    /**
+     * Update file count display after pasting
+     */
+    updateFileCountAfterPaste() {
+        const fileCount = document.getElementById('fileCount');
+        const fileInfo = document.getElementById('fileInfo');
+        
+        if (fileCount && fileInfo) {
+            const count = AppState.processedFiles.length;
+            const originalCount = AppState.originalFileList.length;
+            const pastedCount = count - originalCount;
+            
+            let countText = `${count} file${count > 1 ? 's' : ''} ready for processing`;
+            if (pastedCount > 0) {
+                countText += ` (includes ${pastedCount} pasted image${pastedCount > 1 ? 's' : ''})`;
+            }
+            
+            fileCount.textContent = countText;
+            fileInfo.style.display = 'block';
+        }
+    },
+
+    /**
+     * Show paste notification
+     */
+    showPasteNotification(message, isSuccess = true) {
+        // Remove any existing notifications
+        const existingNotifications = document.querySelectorAll('.paste-notification');
+        existingNotifications.forEach(notification => notification.remove());
+
+        // Create notification
+        const notification = document.createElement('div');
+        notification.className = `paste-notification ${isSuccess ? '' : 'error'}`;
+        notification.innerHTML = message;
+
+        document.body.appendChild(notification);
+
+        // Auto-remove after 4 seconds
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 4000);
     },
 
     async createImagePreviewsForSelection(imageFiles) {

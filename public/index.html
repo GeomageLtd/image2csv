@@ -35,8 +35,8 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="imageFiles">Select Images or Multipage TIFF:</label>
-                    <input type="file" id="imageFiles" accept="image/*,.tif,.tiff" multiple required>
+                    <label for="imageFiles">Select Images or Multipage TIFF (Optional):</label>
+                    <input type="file" id="imageFiles" accept="image/*,.tif,.tiff" multiple>
                     <div class="file-info" id="fileInfo" style="display: none;">
                         <span id="fileCount">0 files selected</span>
                         <button class="remove-all-btn" id="removeAllBtn" onclick="removeAllImages()" title="Remove all images">
@@ -45,6 +45,18 @@
                         <div id="tiffInfo" style="display: none; margin-top: 5px; color: #0056b3;">
                             <small>📄 Multipage TIFF detected - individual pages will be extracted automatically</small>
                             <br><small>💡 Each page will be processed as a separate image for better results</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Clipboard Paste Area - Always Visible -->
+                    <div class="clipboard-paste-area" id="clipboardPasteArea">
+                        <div class="clipboard-instructions">
+                            <div class="clipboard-icon">📋</div>
+                            <h4>Or Add Images from Clipboard</h4>
+                            <p>Press <kbd>Ctrl+V</kbd> (or <kbd>Cmd+V</kbd> on Mac) to paste screenshots or images from your clipboard</p>
+                            <div class="clipboard-hint">
+                                <small>💡 Take a screenshot (PrtScn/Cmd+Shift+4) and paste it here - no file selection needed!</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -56,7 +68,7 @@
                 
                 <div class="form-group">
                     <label for="textPrompt">Text Prompt:</label>
-                    <textarea id="textPrompt" placeholder="Enter your prompt here..." required>I'll send to you screenshot with tables. This table contains only numerical values. Please parse it and show it as table. I DON'T NEED ANY OTHER TEXT, just the table - it's very very important for me. number of columns shouldn't be more than 10.</textarea>
+                    <textarea id="textPrompt" placeholder="Enter your prompt here..." required>I'll send to you screenshot with tables. This table contains only numerical values. Please parse it and show it as table. I DON'T NEED ANY OTHER TEXT, just the table - it's very very important for me. number of columns shouldn't be more than 10. If you can't parse then just return empry csv</textarea>
                 </div>
                 
                 <button type="submit" class="submit-btn" id="submitBtn">

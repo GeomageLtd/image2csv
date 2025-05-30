@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApplication() {
     console.log('🚀 Initializing Image2CSV Application...');
     
+    // Initialize ImagePreview with clipboard support
+    ImagePreview.initialize();
+    
     // Check for result ID in URL on page load
     const resultId = getQueryParam('result');
     if (resultId) {
@@ -49,7 +52,7 @@ function checkTiffLibraryStatus() {
     // Check if TIFF.js is available
     if (typeof UTIF !== 'undefined') {
         console.log('✅ TIFF.js library loaded successfully');
-    } else {
+            } else {
         console.warn('⚠️ TIFF.js library not loaded - TIFF files may not be supported');
     }
 }
@@ -62,7 +65,7 @@ window.AppMain = {
     
     // Re-export main modules for backwards compatibility
     BatchProcessor,
-    CSVProcessor, 
+    CSVProcessor,
     ResultManager,
     DisplayManager,
     ImagePreview,
