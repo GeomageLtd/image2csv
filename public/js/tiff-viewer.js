@@ -297,18 +297,28 @@ function handleFile(file) {
 async function cacheAllPages() {
     const loadingMessage = document.getElementById('loadingMessage');
     const tiffImage = document.getElementById('tiffImage');
+    const cachingStatus = document.getElementById('cachingStatus');
+    const cachingProgressFill = document.getElementById('cachingProgressFill');
+    const cachingText = document.getElementById('cachingText');
     
     try {
-        // Update loading message to show progress
-        loadingMessage.innerHTML = '<div class="spinner"></div>Processing pages: 0 / ' + totalPages;
+        // Show caching status
+        cachingStatus.style.display = 'block';
+        cachingProgressFill.style.width = '0%';
+        cachingText.textContent = 'Starting to cache pages...';
+        
+        // Update initial loading message
+        loadingMessage.innerHTML = '<div class="spinner"></div>Processing pages...';
         
         let processedCount = 0;
         let firstPageDisplayed = false;
         
         // Process pages one at a time to keep UI responsive
         for (let i = 0; i < totalPages; i++) {
-            // Update progress before processing
-            loadingMessage.innerHTML = `<div class="spinner"></div>Processing page ${i + 1} of ${totalPages}...`;
+            // Update caching status
+            const progressPercent = Math.round((i / totalPages) * 100);
+            cachingProgressFill.style.width = `${progressPercent}%`;
+            cachingText.textContent = `Processing page ${i + 1} of ${totalPages}...`;
             
             // Give UI time to update
             await new Promise(resolve => setTimeout(resolve, 50));
@@ -325,7 +335,9 @@ async function cacheAllPages() {
                 }
                 
                 // Update progress after successful processing
-                loadingMessage.innerHTML = `<div class="spinner"></div>Processed: ${processedCount} / ${totalPages}`;
+                const completedPercent = Math.round((processedCount / totalPages) * 100);
+                cachingProgressFill.style.width = `${completedPercent}%`;
+                cachingText.textContent = `Cached: ${processedCount} / ${totalPages} pages (${completedPercent}%)`;
                 
                 // Longer delay between pages to prevent freezing
                 // Adjust this value if needed - higher = more responsive UI, slower caching
@@ -337,14 +349,21 @@ async function cacheAllPages() {
             }
         }
         
-        // All pages cached - hide loading message
+        // All pages cached - update status to complete
+        cachingProgressFill.style.width = '100%';
+        cachingText.textContent = `✅ All ${totalPages} pages cached successfully!`;
+        
+        // Hide loading message
         loadingMessage.style.display = 'none';
         
-        // Show completion message briefly
+        // Show completion message briefly in file info
         const fileInfo = document.getElementById('fileInfo');
         const originalText = fileInfo.textContent;
-        fileInfo.textContent = originalText + ' ✅ All pages cached';
+        fileInfo.textContent = originalText + ' ✅ Ready';
+        
+        // Hide caching status after a delay
         setTimeout(() => {
+            cachingStatus.style.display = 'none';
             fileInfo.textContent = originalText;
         }, 3000);
         
@@ -353,6 +372,7 @@ async function cacheAllPages() {
     } catch (error) {
         console.error('Error caching pages:', error);
         loadingMessage.style.display = 'none';
+        cachingStatus.style.display = 'none';
         const errorMessage = document.getElementById('errorMessage');
         errorMessage.style.display = 'block';
         errorMessage.textContent = `Error caching pages: ${error.message}`;
