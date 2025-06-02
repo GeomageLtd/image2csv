@@ -430,8 +430,7 @@ function displayPage(pageIndex) {
             loadingMessage.style.display = 'none';
         }
         
-        // Reset zoom and center
-        currentZoom = 1;
+        // Maintain current zoom level and update display
         updateZoom();
         centerImage();
         
@@ -457,8 +456,7 @@ function displayPage(pageIndex) {
             tiffImage.src = cachedData.blobUrl;
             tiffImage.style.display = 'block';
             
-            // Reset zoom and center
-            currentZoom = 1;
+            // Maintain current zoom level and update display
             updateZoom();
             centerImage();
             
