@@ -57,11 +57,22 @@ function checkTiffLibraryStatus() {
     }
 }
 
+/**
+ * Open TIFF viewer in a new tab
+ */
+function openTiffViewer() {
+    window.open('/tiff-viewer', '_blank');
+}
+
+// Make openTiffViewer globally accessible
+window.openTiffViewer = openTiffViewer;
+
 // Export for use in other modules
 window.AppMain = {
     initializeApplication,
     getQueryParam,
     checkTiffLibraryStatus,
+    openTiffViewer,
     
     // Re-export main modules for backwards compatibility
     BatchProcessor,

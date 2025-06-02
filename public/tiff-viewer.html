@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geomage - TIFF Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
+    <style>
+        .tiff-viewer-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .tiff-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .tiff-title {
+            color: #333;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .back-btn {
+            background: linear-gradient(45deg, #6c757d, #495057);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+            background: linear-gradient(45deg, #5a6268, #3d4142);
+        }
+
+        .upload-area {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f1f3f4;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #6c757d;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input {
+            opacity: 0;
+            position: absolute;
+            z-index: -1;
+        }
+
+        .file-input-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .viewer-section {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .viewer-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .file-info {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .page-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .page-nav-btn {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 40px;
+        }
+
+        .page-nav-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .page-nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .page-info {
+            font-weight: 600;
+            color: #495057;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .zoom-btn {
+            background: linear-gradient(45deg, #6f42c1, #6610f2);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 35px;
+        }
+
+        .zoom-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(111, 66, 193, 0.3);
+        }
+
+        .zoom-level {
+            font-weight: 600;
+            color: #495057;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .image-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            overflow: auto;
+            max-height: 70vh;
+        }
+
+        .tiff-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            transition: transform 0.3s ease;
+            cursor: grab;
+        }
+
+        .tiff-image:active {
+            cursor: grabbing;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+            text-align: center;
+        }
+
+        .loading-message {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="tiff-viewer-container">
+        <div class="tiff-header">
+            <h1 class="tiff-title">📄 TIFF Viewer</h1>
+            <a href="/" class="back-btn">
+                ← Back to Main
+            </a>
+        </div>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">Upload TIFF File</div>
+            <div class="upload-hint">Drag and drop your TIFF file here or click to browse</div>
+            <div class="file-input-wrapper">
+                <input type="file" id="tiffInput" class="file-input" accept=".tif,.tiff" onchange="handleFileSelect(event)">
+                <button class="file-input-btn" onclick="document.getElementById('tiffInput').click()">
+                    📁 Choose File
+                </button>
+            </div>
+        </div>
+
+        <div class="viewer-section" id="viewerSection">
+            <div class="viewer-controls">
+                <div class="file-info" id="fileInfo">
+                    No file loaded
+                </div>
+                <div class="page-controls">
+                    <button class="page-nav-btn" id="prevBtn" onclick="previousPage()">‹</button>
+                    <div class="page-info" id="pageInfo">Page 1 / 1</div>
+                    <button class="page-nav-btn" id="nextBtn" onclick="nextPage()">›</button>
+                </div>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="zoomOut()">−</button>
+                    <div class="zoom-level" id="zoomLevel">100%</div>
+                    <button class="zoom-btn" onclick="zoomIn()">+</button>
+                    <button class="zoom-btn" onclick="resetZoom()">⌂</button>
+                </div>
+            </div>
+            <div class="image-container" id="imageContainer">
+                <div class="loading-message" id="loadingMessage">
+                    <div class="spinner"></div>
+                    Loading TIFF file...
+                </div>
+                <img id="tiffImage" class="tiff-image" style="display: none;" alt="TIFF Page">
+                <div class="error-message" id="errorMessage" style="display: none;">
+                    Failed to load TIFF file. Please try another file.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let tiffData = null;
+        let tiffBuffer = null; // Store the ArrayBuffer for decoding
+        let currentPage = 0;
+        let totalPages = 0;
+        let currentZoom = 1;
+        let isDragging = false;
+        let startX, startY, scrollLeft, scrollTop;
+
+        // Drag and drop functionality
+        const uploadArea = document.getElementById('uploadArea');
+        const tiffInput = document.getElementById('tiffInput');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.includes('tif')) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            const fileInfo = document.getElementById('fileInfo');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const viewerSection = document.getElementById('viewerSection');
+            const tiffImage = document.getElementById('tiffImage');
+
+            // Show viewer section and loading state
+            viewerSection.style.display = 'block';
+            loadingMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+            tiffImage.style.display = 'none';
+
+            // Update file info
+            fileInfo.textContent = `File: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+
+            // Read the file
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const arrayBuffer = e.target.result;
+                    tiffBuffer = arrayBuffer; // Store for later use
+                    const ifds = UTIF.decode(arrayBuffer);
+                    
+                    if (ifds.length === 0) {
+                        throw new Error('No pages found in TIFF file');
+                    }
+
+                    // Store the raw TIFF data and page info without decoding all pages
+                    tiffData = ifds;
+                    totalPages = ifds.length;
+                    currentPage = 0;
+
+                    console.log(`📄 TIFF file loaded: ${totalPages} page${totalPages > 1 ? 's' : ''} found`);
+
+                    // Update UI and display first page
+                    updatePageInfo();
+                    
+                    // Use setTimeout to allow UI update before displaying first page
+                    setTimeout(() => {
+                        displayPage(0);
+                    }, 10);
+                    
+                } catch (error) {
+                    console.error('Error processing TIFF:', error);
+                    loadingMessage.style.display = 'none';
+                    errorMessage.style.display = 'block';
+                    errorMessage.textContent = `Error: ${error.message}`;
+                }
+            };
+
+            reader.onerror = function() {
+                loadingMessage.style.display = 'none';
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'Failed to read file';
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function displayPage(pageIndex) {
+            if (!tiffData || pageIndex < 0 || pageIndex >= tiffData.length) {
+                return;
+            }
+
+            // Show loading state for page switching
+            const tiffImage = document.getElementById('tiffImage');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            tiffImage.style.display = 'none';
+            errorMessage.style.display = 'none';
+            loadingMessage.style.display = 'block';
+            loadingMessage.innerHTML = '<div class="spinner"></div>Loading page...';
+
+            // Use setTimeout to allow UI update before processing
+            setTimeout(() => {
+                try {
+                    const ifd = tiffData[pageIndex];
+                    
+                    // First decode the image data (this is necessary!)
+                    UTIF.decodeImage(tiffBuffer, ifd);
+                    
+                    // Use the same efficient approach as the main page
+                    const canvas = document.createElement('canvas');
+                    canvas.width = ifd.width;
+                    canvas.height = ifd.height;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Create ImageData and use UTIF's efficient conversion
+                    const imageData = ctx.createImageData(ifd.width, ifd.height);
+                    const rgba = UTIF.toRGBA8(ifd);
+                    imageData.data.set(rgba);
+                    ctx.putImageData(imageData, 0, 0);
+                    
+                    tiffImage.src = canvas.toDataURL();
+                    tiffImage.style.display = 'block';
+                    tiffImage.style.transform = `scale(${currentZoom})`;
+                    
+                    currentPage = pageIndex;
+                    updatePageInfo();
+                    
+                    loadingMessage.style.display = 'none';
+                    
+                } catch (error) {
+                    console.error('Error displaying page:', error);
+                    loadingMessage.style.display = 'none';
+                    errorMessage.style.display = 'block';
+                    errorMessage.textContent = `Error displaying page: ${error.message}`;
+                }
+            }, 10); // Small delay to allow UI update
+        }
+
+        function updatePageInfo() {
+            const pageInfo = document.getElementById('pageInfo');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+
+            pageInfo.textContent = `Page ${currentPage + 1} / ${totalPages}`;
+            prevBtn.disabled = currentPage === 0;
+            nextBtn.disabled = currentPage === totalPages - 1;
+        }
+
+        function previousPage() {
+            if (currentPage > 0) {
+                displayPage(currentPage - 1);
+            }
+        }
+
+        function nextPage() {
+            if (currentPage < totalPages - 1) {
+                displayPage(currentPage + 1);
+            }
+        }
+
+        function zoomIn() {
+            currentZoom = Math.min(currentZoom * 1.2, 5);
+            updateZoom();
+        }
+
+        function zoomOut() {
+            currentZoom = Math.max(currentZoom / 1.2, 0.1);
+            updateZoom();
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            updateZoom();
+        }
+
+        function updateZoom() {
+            const tiffImage = document.getElementById('tiffImage');
+            const zoomLevel = document.getElementById('zoomLevel');
+            
+            tiffImage.style.transform = `scale(${currentZoom})`;
+            zoomLevel.textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+
+        // Add panning functionality
+        const imageContainer = document.getElementById('imageContainer');
+        
+        imageContainer.addEventListener('mousedown', (e) => {
+            if (currentZoom > 1) {
+                isDragging = true;
+                startX = e.pageX - imageContainer.offsetLeft;
+                startY = e.pageY - imageContainer.offsetTop;
+                scrollLeft = imageContainer.scrollLeft;
+                scrollTop = imageContainer.scrollTop;
+                imageContainer.style.cursor = 'grabbing';
+            }
+        });
+
+        imageContainer.addEventListener('mouseleave', () => {
+            isDragging = false;
+            imageContainer.style.cursor = 'grab';
+        });
+
+        imageContainer.addEventListener('mouseup', () => {
+            isDragging = false;
+            imageContainer.style.cursor = 'grab';
+        });
+
+        imageContainer.addEventListener('mousemove', (e) => {
+            if (!isDragging || currentZoom <= 1) return;
+            e.preventDefault();
+            const x = e.pageX - imageContainer.offsetLeft;
+            const y = e.pageY - imageContainer.offsetTop;
+            const walkX = (x - startX) * 2;
+            const walkY = (y - startY) * 2;
+            imageContainer.scrollLeft = scrollLeft - walkX;
+            imageContainer.scrollTop = scrollTop - walkY;
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (!tiffData) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    previousPage();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    nextPage();
+                    break;
+                case '+':
+                case '=':
+                    e.preventDefault();
+                    zoomIn();
+                    break;
+                case '-':
+                    e.preventDefault();
+                    zoomOut();
+                    break;
+                case '0':
+                    e.preventDefault();
+                    resetZoom();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html> 
