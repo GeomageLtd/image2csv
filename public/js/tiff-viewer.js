@@ -302,32 +302,39 @@ async function cacheAllPages() {
         // Update loading message to show progress
         loadingMessage.innerHTML = '<div class="spinner"></div>Processing pages: 0 / ' + totalPages;
         
-        // Process pages in batches to avoid blocking the UI too much
-        const batchSize = 2; // Process 2 pages at a time
         let processedCount = 0;
+        let firstPageDisplayed = false;
         
-        for (let i = 0; i < totalPages; i += batchSize) {
-            const batch = [];
+        // Process pages one at a time to keep UI responsive
+        for (let i = 0; i < totalPages; i++) {
+            // Update progress before processing
+            loadingMessage.innerHTML = `<div class="spinner"></div>Processing page ${i + 1} of ${totalPages}...`;
             
-            // Create batch of promises
-            for (let j = i; j < Math.min(i + batchSize, totalPages); j++) {
-                batch.push(processAndCachePage(j));
+            // Give UI time to update
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            try {
+                // Process single page
+                await processAndCachePage(i);
+                processedCount++;
+                
+                // Display first page as soon as it's ready
+                if (i === 0 && !firstPageDisplayed) {
+                    displayPage(0);
+                    firstPageDisplayed = true;
+                }
+                
+                // Update progress after successful processing
+                loadingMessage.innerHTML = `<div class="spinner"></div>Processed: ${processedCount} / ${totalPages}`;
+                
+                // Longer delay between pages to prevent freezing
+                // Adjust this value if needed - higher = more responsive UI, slower caching
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+            } catch (error) {
+                console.warn(`Failed to cache page ${i + 1}:`, error);
+                // Continue with next page even if one fails
             }
-            
-            // Process batch
-            await Promise.all(batch);
-            processedCount += batch.length;
-            
-            // Update progress
-            loadingMessage.innerHTML = `<div class="spinner"></div>Processing pages: ${processedCount} / ${totalPages}`;
-            
-            // Display first page as soon as it's ready
-            if (i === 0) {
-                displayPage(0);
-            }
-            
-            // Small delay to prevent UI blocking
-            await new Promise(resolve => setTimeout(resolve, 10));
         }
         
         // All pages cached - hide loading message
@@ -339,7 +346,7 @@ async function cacheAllPages() {
         fileInfo.textContent = originalText + ' ✅ All pages cached';
         setTimeout(() => {
             fileInfo.textContent = originalText;
-        }, 2000);
+        }, 3000);
         
         console.log(`✅ All ${totalPages} pages cached successfully`);
         
