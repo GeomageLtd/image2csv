@@ -6,6 +6,7 @@
 // Global state variables
 let tiffData = null;
 let tiffBuffer = null; // Store the ArrayBuffer for decoding
+let pageCache = new Map(); // Cache for processed page data
 let currentPage = 0;
 let totalPages = 0;
 let currentZoom = 1;
@@ -236,6 +237,9 @@ function handleFile(file) {
     const viewerSection = document.getElementById('viewerSection');
     const tiffImage = document.getElementById('tiffImage');
 
+    // Clear previous cache
+    clearPageCache();
+
     // Show viewer section and loading state
     viewerSection.style.display = 'block';
     loadingMessage.style.display = 'block';
@@ -257,20 +261,18 @@ function handleFile(file) {
                 throw new Error('No pages found in TIFF file');
             }
 
-            // Store the raw TIFF data and page info without decoding all pages
+            // Store the raw TIFF data and page info
             tiffData = ifds;
             totalPages = ifds.length;
             currentPage = 0;
 
             console.log(`📄 TIFF file loaded: ${totalPages} page${totalPages > 1 ? 's' : ''} found`);
 
-            // Update UI and display first page
+            // Update UI
             updatePageInfo();
             
-            // Use setTimeout to allow UI update before displaying first page
-            setTimeout(() => {
-                displayPage(0);
-            }, 10);
+            // Start caching all pages
+            cacheAllPages();
             
         } catch (error) {
             console.error('Error processing TIFF:', error);
@@ -290,6 +292,120 @@ function handleFile(file) {
 }
 
 /**
+ * Cache all pages with progress indication
+ */
+async function cacheAllPages() {
+    const loadingMessage = document.getElementById('loadingMessage');
+    const tiffImage = document.getElementById('tiffImage');
+    
+    try {
+        // Update loading message to show progress
+        loadingMessage.innerHTML = '<div class="spinner"></div>Processing pages: 0 / ' + totalPages;
+        
+        // Process pages in batches to avoid blocking the UI too much
+        const batchSize = 2; // Process 2 pages at a time
+        let processedCount = 0;
+        
+        for (let i = 0; i < totalPages; i += batchSize) {
+            const batch = [];
+            
+            // Create batch of promises
+            for (let j = i; j < Math.min(i + batchSize, totalPages); j++) {
+                batch.push(processAndCachePage(j));
+            }
+            
+            // Process batch
+            await Promise.all(batch);
+            processedCount += batch.length;
+            
+            // Update progress
+            loadingMessage.innerHTML = `<div class="spinner"></div>Processing pages: ${processedCount} / ${totalPages}`;
+            
+            // Display first page as soon as it's ready
+            if (i === 0) {
+                displayPage(0);
+            }
+            
+            // Small delay to prevent UI blocking
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        // All pages cached - hide loading message
+        loadingMessage.style.display = 'none';
+        
+        // Show completion message briefly
+        const fileInfo = document.getElementById('fileInfo');
+        const originalText = fileInfo.textContent;
+        fileInfo.textContent = originalText + ' ✅ All pages cached';
+        setTimeout(() => {
+            fileInfo.textContent = originalText;
+        }, 2000);
+        
+        console.log(`✅ All ${totalPages} pages cached successfully`);
+        
+    } catch (error) {
+        console.error('Error caching pages:', error);
+        loadingMessage.style.display = 'none';
+        const errorMessage = document.getElementById('errorMessage');
+        errorMessage.style.display = 'block';
+        errorMessage.textContent = `Error caching pages: ${error.message}`;
+    }
+}
+
+/**
+ * Clear the page cache and release memory
+ */
+function clearPageCache() {
+    // Revoke any existing blob URLs to free memory
+    pageCache.forEach(cached => {
+        if (cached.blobUrl) {
+            URL.revokeObjectURL(cached.blobUrl);
+        }
+    });
+    pageCache.clear();
+}
+
+/**
+ * Process and cache a page
+ */
+function processAndCachePage(pageIndex) {
+    if (pageCache.has(pageIndex)) {
+        return pageCache.get(pageIndex);
+    }
+
+    const ifd = tiffData[pageIndex];
+    
+    // Decode the image data
+    UTIF.decodeImage(tiffBuffer, ifd);
+    
+    // Create canvas and convert to blob URL for better performance
+    const canvas = document.createElement('canvas');
+    canvas.width = ifd.width;
+    canvas.height = ifd.height;
+    const ctx = canvas.getContext('2d');
+    
+    // Create ImageData and use UTIF's efficient conversion
+    const imageData = ctx.createImageData(ifd.width, ifd.height);
+    const rgba = UTIF.toRGBA8(ifd);
+    imageData.data.set(rgba);
+    ctx.putImageData(imageData, 0, 0);
+    
+    // Convert to blob URL (more efficient than data URL)
+    return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+            const blobUrl = URL.createObjectURL(blob);
+            const cachedData = {
+                blobUrl: blobUrl,
+                width: ifd.width,
+                height: ifd.height
+            };
+            pageCache.set(pageIndex, cachedData);
+            resolve(cachedData);
+        }, 'image/png', 0.95);
+    });
+}
+
+/**
  * Display a specific page of the TIFF
  */
 function displayPage(pageIndex) {
@@ -297,58 +413,69 @@ function displayPage(pageIndex) {
         return;
     }
 
-    // Show loading state for page switching
     const tiffImage = document.getElementById('tiffImage');
     const loadingMessage = document.getElementById('loadingMessage');
     const errorMessage = document.getElementById('errorMessage');
     
+    // Check if page is already cached
+    if (pageCache.has(pageIndex)) {
+        // Page is cached - display immediately
+        const cachedData = pageCache.get(pageIndex);
+        tiffImage.src = cachedData.blobUrl;
+        tiffImage.style.display = 'block';
+        errorMessage.style.display = 'none';
+        
+        // Only hide loading message if we're not still caching other pages
+        if (pageCache.size === totalPages) {
+            loadingMessage.style.display = 'none';
+        }
+        
+        // Reset zoom and center
+        currentZoom = 1;
+        updateZoom();
+        centerImage();
+        
+        currentPage = pageIndex;
+        updatePageInfo();
+        
+        return;
+    }
+
+    // Page not cached yet - this should rarely happen with the new approach
+    // but keep it as fallback
     tiffImage.style.display = 'none';
     errorMessage.style.display = 'none';
-    loadingMessage.style.display = 'block';
-    loadingMessage.innerHTML = '<div class="spinner"></div>Loading page...';
+    
+    if (loadingMessage.style.display === 'none') {
+        loadingMessage.style.display = 'block';
+        loadingMessage.innerHTML = '<div class="spinner"></div>Loading page...';
+    }
 
-    // Use setTimeout to allow UI update before processing
-    setTimeout(() => {
-        try {
-            const ifd = tiffData[pageIndex];
-            
-            // First decode the image data (this is necessary!)
-            UTIF.decodeImage(tiffBuffer, ifd);
-            
-            // Use the same efficient approach as the main page
-            const canvas = document.createElement('canvas');
-            canvas.width = ifd.width;
-            canvas.height = ifd.height;
-            const ctx = canvas.getContext('2d');
-            
-            // Create ImageData and use UTIF's efficient conversion
-            const imageData = ctx.createImageData(ifd.width, ifd.height);
-            const rgba = UTIF.toRGBA8(ifd);
-            imageData.data.set(rgba);
-            ctx.putImageData(imageData, 0, 0);
-            
-            tiffImage.src = canvas.toDataURL();
+    // Process and cache the page
+    processAndCachePage(pageIndex)
+        .then(cachedData => {
+            tiffImage.src = cachedData.blobUrl;
             tiffImage.style.display = 'block';
             
-            // Reset zoom to 1 and apply proper sizing
+            // Reset zoom and center
             currentZoom = 1;
             updateZoom();
-            
-            // Center the image in the container
             centerImage();
             
             currentPage = pageIndex;
             updatePageInfo();
             
-            loadingMessage.style.display = 'none';
-            
-        } catch (error) {
+            // Only hide loading if all pages are cached
+            if (pageCache.size === totalPages) {
+                loadingMessage.style.display = 'none';
+            }
+        })
+        .catch(error => {
             console.error('Error displaying page:', error);
             loadingMessage.style.display = 'none';
             errorMessage.style.display = 'block';
             errorMessage.textContent = `Error displaying page: ${error.message}`;
-        }
-    }, 10); // Small delay to allow UI update
+        });
 }
 
 /**
