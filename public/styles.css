@@ -32,3 +32,31 @@
    - Modular loading for performance optimization
    - Clear separation of concerns
 */ 
+
+/* API Key Status Styles */
+.api-key-status {
+    margin-top: 5px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    display: none;
+}
+
+.api-key-status.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.api-key-status.info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.api-key-status.warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+} 

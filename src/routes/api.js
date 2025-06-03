@@ -1,7 +1,25 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const resultService = require('../services/resultService');
 
 const router = express.Router();
+
+// Get default API key
+router.get('/default-api-key', (req, res) => {
+    try {
+        const apiKeyPath = path.join(__dirname, '../../chatgptapikey.txt');
+        if (fs.existsSync(apiKeyPath)) {
+            const apiKey = fs.readFileSync(apiKeyPath, 'utf8').trim();
+            res.json({ apiKey });
+        } else {
+            res.status(404).json({ error: 'API key file not found' });
+        }
+    } catch (error) {
+        console.error('Error reading API key:', error);
+        res.status(500).json({ error: 'Failed to read API key' });
+    }
+});
 
 // Save processing result
 router.post('/save-result', async (req, res) => {

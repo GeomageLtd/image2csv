@@ -4,15 +4,18 @@
  */
 
 // Initialize application when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApplication();
+document.addEventListener('DOMContentLoaded', async function() {
+    await initializeApplication();
 });
 
 /**
  * Initialize the application
  */
-function initializeApplication() {
+async function initializeApplication() {
     console.log('🚀 Initializing Image2CSV Application...');
+    
+    // Initialize API Key Manager first to load default key
+    await ApiKeyManager.initialize();
     
     // Initialize ImagePreview with clipboard support
     ImagePreview.initialize();
