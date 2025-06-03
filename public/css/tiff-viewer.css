@@ -1,6 +1,6 @@
 /* ================================
-   TIFF VIEWER STYLES
-   Dedicated styling for the TIFF viewer page
+   TIFF VIEWER STYLES - DESKTOP OPTIMIZED
+   Two-column layout for desktop monitors
    ================================ */
 
 body {
@@ -60,18 +60,43 @@ body {
     transform: translateY(-2px);
 }
 
+/* Two-Column Layout */
+.main-content {
+    display: flex;
+    gap: 20px;
+    height: calc(100vh - 140px); /* Adjust for header height */
+}
+
+.image-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Allows flex item to shrink */
+}
+
+.control-panel {
+    width: 320px;
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    max-height: 100%;
+}
+
 .viewer-section {
-    margin-bottom: 30px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .image-container {
     background: #f8f9fa;
     border-radius: 10px;
     padding: 20px;
-    margin-bottom: 20px;
     text-align: center;
-    overflow: auto; /* Ensures scrolling works in all directions */
-    height: 70vh;
+    overflow: auto;
+    flex: 1;
     border: 2px solid #e9ecef;
     position: relative;
     cursor: grab;
@@ -114,43 +139,60 @@ body {
     cursor: grabbing;
 }
 
-.viewer-controls {
+/* Control Panel Styles */
+.control-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.control-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.control-title {
+    color: #495057;
+    font-size: 16px;
+    margin: 0 0 15px 0;
+    font-weight: 600;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 15px 20px;
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
+    gap: 8px;
 }
 
 .file-info {
     font-weight: 600;
     color: #495057;
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 6px;
+    word-break: break-all;
+    font-size: 13px;
 }
 
 .page-controls {
     display: flex;
-    align-items: center;
-    gap: 15px;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
 }
 
 .page-nav-btn {
     background: linear-gradient(45deg, #28a745, #20c997);
     color: white;
     border: none;
-    padding: 10px 15px;
+    padding: 12px 16px;
     border-radius: 6px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-width: 40px;
+    width: 100%;
 }
 
 .page-nav-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
 }
 
@@ -163,27 +205,38 @@ body {
 .page-info {
     font-weight: 600;
     color: #495057;
-    min-width: 120px;
     text-align: center;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin: 5px 0;
+}
+
+.keyboard-shortcuts {
+    background: #f1f3f4;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 10px;
 }
 
 .zoom-controls {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
 }
 
 .zoom-btn {
     background: linear-gradient(45deg, #6f42c1, #6610f2);
     color: white;
     border: none;
-    padding: 8px 12px;
+    padding: 10px 14px;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-width: 35px;
+    width: 100%;
 }
 
 .zoom-btn:hover {
@@ -191,20 +244,50 @@ body {
     box-shadow: 0 3px 10px rgba(111, 66, 193, 0.3);
 }
 
+.zoom-btn.reset {
+    background: linear-gradient(45deg, #17a2b8, #138496);
+}
+
 .zoom-level {
     font-weight: 600;
     color: #495057;
-    min-width: 60px;
     text-align: center;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin: 5px 0;
+}
+
+.zoom-info {
+    background: #f1f3f4;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.help-content ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #6c757d;
+    font-size: 13px;
+}
+
+.help-content li {
+    margin-bottom: 5px;
 }
 
 .upload-area {
     background: #f8f9fa;
     border: 2px dashed #dee2e6;
     border-radius: 15px;
-    padding: 30px;
+    padding: 40px 30px;
     text-align: center;
     transition: all 0.3s ease;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .upload-area.dragover {
@@ -291,8 +374,8 @@ body {
 
 /* Caching Status Styles */
 .caching-status {
-    margin: 10px 0;
-    padding: 8px 12px;
+    margin: 15px 0 0 0;
+    padding: 12px;
     background: #f8f9fa;
     border: 1px solid #e9ecef;
     border-radius: 6px;
@@ -305,7 +388,7 @@ body {
     background-color: #e9ecef;
     border-radius: 4px;
     overflow: hidden;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
 }
 
 .caching-progress-fill {
@@ -320,4 +403,27 @@ body {
     color: #495057;
     font-weight: 500;
     text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .control-panel {
+        width: 280px;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        flex-direction: column;
+        height: auto;
+    }
+    
+    .control-panel {
+        width: 100%;
+        order: -1; /* Put controls on top for mobile */
+    }
+    
+    .image-panel {
+        height: 60vh;
+    }
 } 

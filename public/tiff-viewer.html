@@ -19,59 +19,101 @@
             </a>
         </div>
 
-        <!-- Image Viewer Section -->
-        <div class="viewer-section" id="viewerSection" style="display: none;">
-            <!-- Image Container -->
-            <div class="image-container" id="imageContainer">
-                <div class="loading-message" id="loadingMessage">
-                    <div class="spinner"></div>
-                    Loading TIFF file...
-                </div>
-                <img id="tiffImage" class="tiff-image" style="display: none;" alt="TIFF Page">
-                <div class="error-message" id="errorMessage" style="display: none;">
-                    Failed to load TIFF file. Please try another file.
-                </div>
-            </div>
-            
-            <!-- Controls -->
-            <div class="viewer-controls">
-                <div class="file-info" id="fileInfo">
-                    No file loaded
-                </div>
-                
-                <!-- Caching Status -->
-                <div class="caching-status" id="cachingStatus" style="display: none;">
-                    <div class="caching-progress-bar">
-                        <div class="caching-progress-fill" id="cachingProgressFill"></div>
+        <!-- Main Content - Two Column Layout -->
+        <div class="main-content">
+            <!-- Left Panel - Image Viewer -->
+            <div class="image-panel">
+                <!-- Image Viewer Section -->
+                <div class="viewer-section" id="viewerSection" style="display: none;">
+                    <!-- Image Container -->
+                    <div class="image-container" id="imageContainer">
+                        <div class="loading-message" id="loadingMessage">
+                            <div class="spinner"></div>
+                            Loading TIFF file...
+                        </div>
+                        <img id="tiffImage" class="tiff-image" style="display: none;" alt="TIFF Page">
+                        <div class="error-message" id="errorMessage" style="display: none;">
+                            Failed to load TIFF file. Please try another file.
+                        </div>
                     </div>
-                    <div class="caching-text" id="cachingText">Caching pages...</div>
                 </div>
-                
-                <div class="page-controls">
-                    <button class="page-nav-btn" id="prevBtn" onclick="previousPage()">‹</button>
-                    <div class="page-info" id="pageInfo">Page 1 / 1</div>
-                    <button class="page-nav-btn" id="nextBtn" onclick="nextPage()">›</button>
-                </div>
-                <div class="zoom-controls">
-                    <button class="zoom-btn" onclick="zoomOut()">−</button>
-                    <div class="zoom-level" id="zoomLevel">100%</div>
-                    <button class="zoom-btn" onclick="zoomIn()">+</button>
-                    <button class="zoom-btn" onclick="resetZoom()">⌂</button>
-                    <small style="margin-left: 15px; color: #6c757d;">🖱️ Scroll to zoom</small>
+
+                <!-- Upload Area -->
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <div class="upload-text">Upload TIFF File</div>
+                    <div class="upload-hint">Drag and drop your TIFF file here or click to browse</div>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="tiffInput" class="file-input" accept=".tif,.tiff" onchange="handleFileSelect(event)">
+                        <button class="file-input-btn" onclick="document.getElementById('tiffInput').click()">
+                            📁 Choose File
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Upload Area -->
-        <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📄</div>
-            <div class="upload-text">Upload TIFF File</div>
-            <div class="upload-hint">Drag and drop your TIFF file here or click to browse</div>
-            <div class="file-input-wrapper">
-                <input type="file" id="tiffInput" class="file-input" accept=".tif,.tiff" onchange="handleFileSelect(event)">
-                <button class="file-input-btn" onclick="document.getElementById('tiffInput').click()">
-                    📁 Choose File
-                </button>
+            <!-- Right Panel - Controls -->
+            <div class="control-panel">
+                <div class="control-section">
+                    <h3 class="control-title">📁 File Info</h3>
+                    <div class="file-info" id="fileInfo">
+                        No file loaded
+                    </div>
+                    
+                    <!-- Caching Status -->
+                    <div class="caching-status" id="cachingStatus" style="display: none;">
+                        <div class="caching-progress-bar">
+                            <div class="caching-progress-fill" id="cachingProgressFill"></div>
+                        </div>
+                        <div class="caching-text" id="cachingText">Caching pages...</div>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3 class="control-title">📄 Page Navigation</h3>
+                    <div class="page-controls">
+                        <button class="page-nav-btn" id="prevBtn" onclick="previousPage()">
+                            ‹ Previous
+                        </button>
+                        <div class="page-info" id="pageInfo">Page 1 / 1</div>
+                        <button class="page-nav-btn" id="nextBtn" onclick="nextPage()">
+                            Next ›
+                        </button>
+                    </div>
+                    <div class="keyboard-shortcuts">
+                        <small>
+                            🎮 <strong>Shortcuts:</strong><br>
+                            ← → Arrow keys to navigate<br>
+                            +/- to zoom, 0 to reset
+                        </small>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3 class="control-title">🔍 Zoom Controls</h3>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomOut()">− Zoom Out</button>
+                        <div class="zoom-level" id="zoomLevel">100%</div>
+                        <button class="zoom-btn" onclick="zoomIn()">+ Zoom In</button>
+                        <button class="zoom-btn reset" onclick="resetZoom()">⌂ Reset</button>
+                    </div>
+                    <div class="zoom-info">
+                        <small>🖱️ <strong>Mouse:</strong> Scroll to zoom, drag to pan</small>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3 class="control-title">ℹ️ Help</h3>
+                    <div class="help-content">
+                        <ul>
+                            <li><strong>Upload:</strong> Drag & drop or click to browse</li>
+                            <li><strong>Navigate:</strong> Use arrow keys or buttons</li>
+                            <li><strong>Zoom:</strong> Mouse wheel or +/- buttons</li>
+                            <li><strong>Pan:</strong> Click and drag the image</li>
+                            <li><strong>Reset:</strong> Press 0 or click reset button</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
